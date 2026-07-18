@@ -1,0 +1,140 @@
+/*
+ * .chrome-slider — recessed-groove range input.
+ *
+ * A real <input type="range"> is styled into a slot machined into
+ * chrome. The track is a NEUTRAL recessed slot (no theme tint — a
+ * slider has no emitted-light source inside it, so the rim catch is
+ * pure ambient white); the thumb is a small chrome-raised pill with
+ * a top highlight, matching PushButton's raised-front gradient.
+ *
+ * Engines: track + thumb pseudos are vendor-prefixed and do NOT
+ * inherit, so the rules are duplicated for ::-webkit-* and ::-moz-*.
+ * Firefox additionally requires explicit ::-moz-range-progress
+ * styling to prevent the default blue fill.
+ */
+
+.chrome-slider {
+  --slider-track-h: 6px;
+  --slider-thumb-w: 14px;
+  --slider-thumb-h: 16px;
+  /* Match the NumberField's --numberfield-h so the two sit on a
+     shared baseline when composed in [data-dials-number]. */
+  --slider-h: 22px;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-width: 80px;
+  height: var(--slider-h);
+}
+
+.chrome-slider input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  width: 100%;
+  height: var(--slider-h);
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.chrome-slider.is-disabled input[type='range'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ----- Track ----- */
+
+.chrome-slider input[type='range']::-webkit-slider-runnable-track {
+  width: 100%;
+  height: var(--slider-track-h);
+  border-radius: 999px;
+  background: var(--chrome-scrollbar-track);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.7),
+    inset 0 -1px 0 var(--chrome-rim-light);
+}
+
+.chrome-slider input[type='range']::-moz-range-track {
+  width: 100%;
+  height: var(--slider-track-h);
+  border-radius: 999px;
+  background: var(--chrome-scrollbar-track);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.7),
+    inset 0 -1px 0 var(--chrome-rim-light);
+}
+
+/* Firefox-only — kill the default highlight on the "filled" portion
+   so the track reads as one continuous slot. */
+.chrome-slider input[type='range']::-moz-range-progress {
+  background: transparent;
+  height: var(--slider-track-h);
+  border-radius: 999px;
+}
+
+/* ----- Thumb ----- */
+
+.chrome-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--slider-thumb-w);
+  height: var(--slider-thumb-h);
+  border: none;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.18) 0%, rgb(11 11 11 / 0) 80%),
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 1px 2px rgb(0 0 0 / 0.7),
+    0 2px 4px rgb(0 0 0 / 0.45);
+  /* Centre the thumb on the track: (track-h - thumb-h) / 2. */
+  margin-top: calc((var(--slider-track-h) - var(--slider-thumb-h)) / 2);
+  cursor: pointer;
+  transition: filter 200ms ease;
+}
+
+.chrome-slider input[type='range']::-moz-range-thumb {
+  width: var(--slider-thumb-w);
+  height: var(--slider-thumb-h);
+  border: none;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.18) 0%, rgb(11 11 11 / 0) 80%),
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 1px 2px rgb(0 0 0 / 0.7),
+    0 2px 4px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  transition: filter 200ms ease;
+}
+
+@media (hover: hover) {
+  .chrome-slider:not(.is-disabled) input[type='range']:hover::-webkit-slider-thumb {
+    filter: brightness(1.15);
+  }
+  .chrome-slider:not(.is-disabled) input[type='range']:hover::-moz-range-thumb {
+    filter: brightness(1.15);
+  }
+}
+
+.chrome-slider input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 0 0 2px var(--theme-lit-edge),
+    0 1px 2px rgb(0 0 0 / 0.7);
+}
+
+.chrome-slider input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 0 0 2px var(--theme-lit-edge),
+    0 1px 2px rgb(0 0 0 / 0.7);
+}

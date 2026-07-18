@@ -1,0 +1,116 @@
+{
+  "screen": {
+    "persistence": {
+      "value": 0.887
+    },
+    "persistenceBeta": {
+      "value": 1.65
+    },
+    "intensity": {
+      "value": 0.4
+    },
+    "beamWidth": {
+      "value": 2.8
+    },
+    "halationStrength": {
+      "value": 1.74
+    },
+    "halationSigma": {
+      "value": 8
+    },
+    "halationTint": {
+      "value": 0.73
+    },
+    "saturationKnee": {
+      "value": 9.5
+    },
+    "whiteHot": {
+      "value": 8
+    },
+    "grain": {
+      "value": 0.129
+    },
+    "flicker": {
+      "value": 0.023
+    },
+    "alpha": {
+      "value": 0.85
+    }
+  },
+  "waves": [
+    {
+      "beam": {
+        "intensity": {
+          "value": 0.34
+        },
+        "width": {
+          "value": 0.94
+        }
+      },
+      "sweep": {
+        "sweepSec": {
+          "value": 0.0028
+        },
+        "xJitter": {
+          "value": 0.001
+        },
+        "fireLevel": {
+          "value": 0.18
+        },
+        "armLevel": {
+          "value": 0.599
+        },
+        "phaseLock": {
+          "value": 0
+        }
+      },
+      "noiseFloor": {
+        "amp": {
+          "value": 0
+        },
+        "seed": {
+          "value": 1
+        }
+      },
+      "fundamentals": [
+        {
+          "freq": {
+            "value": 1473
+          },
+          "amp": {
+            "value": 0.32
+          },
+          "phase": {
+            "value": 0
+          }
+        },
+        {
+          "freq": {
+            "value": 600
+          },
+          "amp": {
+            "value": 0.4
+          },
+          "phase": {
+            "value": 0
+          }
+        }
+      ],
+      "bursts": []
+    }
+  ],
+  "pointer": {
+    "sizePx": {
+      "value": 24.217868687513263
+    },
+    "intensity": {
+      "value": 0.41
+    },
+    "interpolation": {
+      "value": 8
+    },
+    "rotation": {
+      "value": 0
+    }
+  }
+}

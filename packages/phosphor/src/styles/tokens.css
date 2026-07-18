@@ -1,0 +1,386 @@
+/*
+ * Chrome aesthetic tokens — the 80s audio-equipment look.
+ *
+ * Values that the rest of the design system reads (`--color-*`,
+ * `--surface-*`) live elsewhere; this file defines the chrome-specific
+ * extensions used by chrome primitives (Panel, PushButton, LeverSwitch,
+ * SegmentedDisplay, Display).
+ *
+ * Naming: `--chrome-<area>-<facet>`.
+ *   <area>  = panel | grain | bezel | glow | metal | accent | display
+ *   <facet> = e.g. fill, stroke, shadow, gradient
+ */
+
+:root {
+  /* Slate stack — darks shading from near-black through subtle highlights. */
+  --chrome-slate-darkest: #131212;
+  --chrome-slate-dark: #1a1a1a;
+  --chrome-slate-base: #232123;
+  --chrome-slate-light: #2c2a2c;
+  --chrome-slate-edge: #3a373a;
+
+  /*
+   * Primary accent. Resolves through --theme-lit-* so a single hue
+   * change re-skins the entire chrome family. The active hue lives in
+   * theme.css and may be overridden at runtime by the theme picker.
+   */
+  --chrome-accent: var(--theme-lit);
+  --chrome-accent-bright: var(--theme-lit-bright);
+  --chrome-accent-dim: oklch(0.45 0.12 var(--theme-hue));
+  --chrome-accent-glow: var(--theme-lit-glow);
+
+  /* Secondary segmented-display color — kept hue-locked at green so
+     primary/secondary readouts can coexist visually. The brand color
+     can shift; this stays the "VU meter green" complement. */
+  --chrome-display-green: oklch(0.85 0.18 145);
+  --chrome-display-green-glow: oklch(0.85 0.18 145 / 0.55);
+
+  /* Panel surface — sanded-grain composite. */
+  --chrome-panel-bg:
+    radial-gradient(
+      ellipse at top,
+      var(--chrome-slate-light) 0%,
+      var(--chrome-slate-base) 60%,
+      var(--chrome-slate-dark) 100%
+    );
+  /*
+   * Raised-plate shadow stack. Inset highlights only — the rim
+   * itself is rendered as a gradient strip via the panel's ::after
+   * pseudo so it can carry a horizontal gradient (darker at corners,
+   * brighter in the middle) like the push button's `.edge`.
+   *
+   *   - inset top highlight     light grazing the upper edge
+   *   - inset bottom catch      thin lit sliver inside bottom edge
+   *   - cast shadow             ambient occlusion at the plate base
+   */
+  --chrome-panel-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    inset 0 -2px 0 rgb(255 255 255 / 0.04),
+    0 4px 6px rgb(0 0 0 / 0.35);
+
+  /*
+   * Bevel gradient — the bright middle is a long flat plateau, with
+   * the dark ramps tightly localized to the last ~10% near each
+   * corner. Reads as a straight rim that wraps and darkens only
+   * where the corner radius bends away from the light.
+   *
+   *    0%   darkest    hsl(0 0% 8%)
+   *    8%   bright     hsl(0 0% 19%)   ← plateau begins
+   *   92%   bright     hsl(0 0% 19%)   ← plateau ends
+   *  100%   darkest    hsl(0 0% 8%)
+   */
+  --chrome-bevel-gradient:
+    linear-gradient(
+      to right,
+      hsl(0 0% 8%) 0%,
+      hsl(0 0% 19%) 8%,
+      hsl(0 0% 19%) 92%,
+      hsl(0 0% 8%) 100%
+    );
+  --chrome-panel-radius: 12px;
+
+  /* Bezel — the inset frame around a sub-element (display, knob well). */
+  --chrome-bezel-bg: var(--chrome-slate-darkest);
+  --chrome-bezel-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.6),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04);
+  --chrome-bezel-radius: 6px;
+
+  /*
+   * ===== Recessed-screen primitives =====
+   * Shared between the OLED frame and any other "dark luminous
+   * surface chamfered into a chrome bezel" so the visual seam between
+   * bezel and screen is identical across primitives.
+   */
+
+  /* The thick black ring that sits between the chrome front and the
+     screen itself — a solid black manufactured frame around the
+     recessed glass. */
+  --chrome-screen-rim-color: #000;
+  --chrome-screen-rim-thickness: 12px;
+
+  /* Inset shadows applied to the screen face itself, providing the
+     subtle "this is recessed into the panel" depth cue. The chamfer
+     is in the rim (above); these are just gentle interior shading.
+     Bottom catch derives from --display-color so it co-tints with
+     the rest of the screen interface family. */
+  --chrome-screen-recess-shadow:
+    inset 0 2px 6px rgb(0 0 0 / 0.6),
+    inset 0 -1px 0 color-mix(in oklch, var(--display-color) 18%, transparent);
+
+  /*
+   * ===== Per-display emitted color =====
+   *
+   * `--display-color` is the **emitted-light color of THIS particular
+   * embedded display** — the one the chrome around it is supposedly
+   * catching light from. Every chrome-side effect tied to a display
+   * (rim catch, body tint, spill, bezel rim, lit segment glow) derives
+   * from this single token, so an embedded-display component can
+   * override --display-color in its own scope and the whole chamfer
+   * family re-tints in unison.
+   *
+   * Default = --theme-lit, so standalone .screen-embedded usage with no
+   * override matches the page accent. A SegmentedDisplay passing
+   * color="oklch(0.86 0.20 145)" sets --display-color on its wrapper
+   * and the body fill, rim catch, glyph color, and glow all switch to
+   * green regardless of the theme hue.
+   */
+  --display-color: var(--theme-lit);
+
+  /* Screen-body tints derived from the display's emitted color. Mostly
+     black, with a small amount of the emitted color blended in to read
+     as the unlit screen catching residual self-bloom. Different blend
+     amounts at center vs edge give the radial spill its depth cue. */
+  --chrome-screen-body-center: color-mix(in oklch, var(--display-color) 12%, #0a0a0a);
+  --chrome-screen-body-edge: color-mix(in oklch, var(--display-color) 5%, #050505);
+
+  /*
+   * Screen-seam light treatment — the colors used at the seam
+   * between the black bezel and the luminous screen body. Consumed
+   * by the lip/bezel/embedded-screen recipes below so the shared
+   * tone reads from one source of truth.
+   *
+   *   --chrome-screen-rim-catch   bright thin catch right at the seam
+   *                               (the chrome's rolled inner lip
+   *                               catching emitted light)
+   *   --chrome-screen-haze        very faint ambient wash a few
+   *                               units past the seam
+   *   --chrome-screen-seam-dark   the manufactured-dark hairline on
+   *                               the OPPOSITE side of the seam
+   *                               (where chrome rolls down into the
+   *                               margin, in shadow from the screen)
+   */
+  --chrome-screen-rim-catch: color-mix(in oklch, var(--display-color) 55%, transparent);
+  --chrome-screen-haze: color-mix(in oklch, var(--display-color) 8%, transparent);
+  --chrome-screen-seam-dark: rgb(0 0 0 / 0.5);
+
+  /*
+   * Neutral chrome rim-catch — the SPEC analog of --chrome-screen-rim-catch
+   * for chrome-only controls (Slider track, recessed Tab, chrome-engraved
+   * HelpTooltip well). No theme color: there's no emitted-light source
+   * inside these primitives, so the rim is a pure ambient highlight from
+   * room light, not coloured spill. Use this whenever you'd be tempted to
+   * reach for --chrome-screen-rim-catch on a non-display primitive.
+   */
+  --chrome-rim-light: rgb(255 255 255 / 0.18);
+
+  /*
+   * Neutral recessed-chrome chamfer — the SPEC analog of --embedded-chamfer
+   * for "chrome pressed into the chassis" states (active Tab, recessed
+   * well, indented button). Same shadow geometry as the embedded-screen
+   * chamfer (inner cast shadow + outer thin dark line) but uses
+   * --chrome-rim-light for the lit edge so no theme tint sneaks in.
+   *
+   * Pair with --chrome-slate-darker (or a similar neutral chrome fill) as
+   * the background; don't pair with the embedded-screen oklch fill, that
+   * would re-introduce the display-look the whole point is avoiding.
+   */
+  --chrome-recessed-chamfer:
+    inset 0 2px 4px rgb(0 0 0 / 0.55),
+    inset 0 -1px 0 var(--chrome-rim-light),
+    0 0 0 1px rgb(0 0 0 / 0.6),
+    0 1px 1px var(--chrome-rim-light);
+
+  /*
+   * ===== OLED-family named effect recipes =====
+   * First-class identities for the cherished visual effects on Screen,
+   * Bezel, Lip, and EmbeddedScreen. Each is a complete `background`
+   * or `box-shadow` expression composed from the color tokens above.
+   *
+   * The composition rules (which owner paints which effect) are:
+   *
+   *   Screen   = back panel + Spill + Recess depth shading
+   *              (--spill, --recess)
+   *
+   *   Bezel    = black ring + own inner-edge Rim catching screen-light
+   *              (--bezel-rim)
+   *
+   *   Lip      = chrome chamfer around a Bezel; carries the outer
+   *              chamfer Catch, the manufactured Lip↔Bezel Seam-dark,
+   *              and the ambient Haze that washes the surrounding
+   *              chrome from screen-light
+   *              (--lip-catch, --lip-seam, --lip-haze; the .lip class
+   *              packs these into a unified box-shadow at composition
+   *              time so the Bezel inside doesn't have to know)
+   *
+   *   EmbeddedScreen = Screen mounted bare on a host (e.g. a Panel)
+   *                    with no Bezel or Lip; carries a single
+   *                    chamfer recipe that collapses all four
+   *                    interface effects (outer catch, seam-dark,
+   *                    inner highlight, recess depth) onto its own
+   *                    box-shadow
+   *                    (--embedded-chamfer)
+   *
+   * Tweak any recipe to retune the whole family in one place; tweak
+   * the color tokens above to retune just the tones.
+   */
+
+  /* Screen — back panel + Spill (display-color-tinted bloom from
+     holographic content onto the unlit back). The radial is the
+     bloom itself, derived from the screen body tints (which
+     themselves chain off --display-color). The additive linear at
+     top-left is the ambient lift (slightly brighter where overhead
+     room light grazes the upper-left of the back panel) and uses a
+     stronger display-color blend so the chrome around the seam reads
+     as catching the emitted light. */
+  --spill:
+    linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--display-color) 22%, transparent) 0%,
+      transparent 18%
+    ),
+    radial-gradient(
+      ellipse at 50% 45%,
+      var(--chrome-screen-body-center) 0%,
+      var(--chrome-screen-body-edge) 100%
+    );
+
+  /* Screen — gentle interior depth shading. NOT rim-light; just an
+     inset-top shadow selling "this surface is recessed into its host."
+     The actual rim-light at the bezel↔screen interface belongs to
+     the Bezel (--bezel-rim). */
+  --recess: inset 0 2px 6px rgb(0 0 0 / 0.6);
+
+  /* Bezel — the inner-edge rim-light at the bezel↔screen interface,
+     painted by the Bezel onto its own inner edge. A faint display-
+     color-tinted hairline at the bottom of the bezel's inset, catching
+     emitted light from the screen sitting inside it. */
+  --bezel-rim: inset 0 -1px 0 color-mix(in oklch, var(--display-color) 18%, transparent);
+
+  /* Lip — outer chamfer Catch + manufactured Lip↔Bezel Seam-dark +
+     ambient Haze that washes the surrounding chrome from screen-light.
+     Conceptually these are properties of the Lip (the chrome around
+     the bezel) catching emitted screen-light. Physically they're
+     painted as OUTSET box-shadows on the .bezel element because the
+     bezel's box edge IS the bezel↔chrome seam — outsets from the
+     bezel land precisely on the chrome face we want to tint. */
+  --lip-catch: 0 1px 2px 0 var(--chrome-screen-rim-catch);
+  --lip-seam:  0 -1px 0 var(--chrome-screen-seam-dark);
+  --lip-haze:  0 0 16px 2px var(--chrome-screen-haze);
+
+  /* EmbeddedScreen — the four-shadow chamfer stack for a Screen
+     mounted bare on a Panel (no Bezel, no Lip). Collapses all four
+     interface effects into one box-shadow on the screen element
+     itself:
+       1. inset top   — recess depth (same role as --recess)
+       2. inset bot   — inner highlight (same role as --bezel-rim,
+                        scaled brighter because there's no separate
+                        bezel to share the rim with)
+       3. outer 1px   — manufactured-black hairline (the chamfer's
+                        machined seam where the screen meets the
+                        surrounding chrome — same role as --lip-seam)
+       4. outer 1px   — outer catch on the surrounding chrome
+                        (same role as --lip-catch) */
+  --embedded-chamfer:
+    inset 0 2px 4px rgb(0 0 0 / 0.55),
+    inset 0 -1px 0 var(--chrome-screen-rim-catch),
+    0 0 0 1px rgb(0 0 0 / 0.6),
+    0 1px 1px var(--chrome-screen-rim-catch);
+
+  /* Bezel default thickness. Override per-instance for thin bezels
+     (HueStrip uses a slim variant) or thick (Display defaults to the
+     standard OLED ring). */
+  --bezel-thickness: var(--chrome-screen-rim-thickness);
+
+  /* Pushable button gradients (front face / edge / shadow). */
+  --chrome-button-front:
+    linear-gradient(
+      to bottom,
+      var(--chrome-slate-light) 0%,
+      var(--chrome-slate-base) 100%
+    );
+  --chrome-button-edge:
+    linear-gradient(
+      to right,
+      var(--chrome-slate-darkest) 0%,
+      var(--chrome-slate-edge) 8%,
+      var(--chrome-slate-edge) 92%,
+      var(--chrome-slate-darkest) 100%
+    );
+  --chrome-button-shadow: 0 2px 6px rgb(0 0 0 / 0.6);
+  --chrome-button-radius: 8px;
+  /*
+   * Push button label brightness ladder. Same hue at four lightness
+   * rungs so brightness alone communicates state — idle through
+   * selected+hover. All four are lit in the brand color; the contrast
+   * is between dim and bright, never between hue and neutral.
+   */
+  --chrome-button-label: oklch(0.62 0.10 var(--theme-hue));
+  --chrome-button-label-hover: oklch(0.74 0.14 var(--theme-hue));
+  --chrome-button-label-active: oklch(0.82 0.18 var(--theme-hue));
+  --chrome-button-label-active-hover: oklch(0.90 0.22 var(--theme-hue));
+
+  /* T3D engraved-label shadow stack. */
+  --chrome-text-emboss:
+    0 0 2px rgb(160 160 159 / 0.45),
+    0 1px 0 rgb(37 37 37 / 0.9),
+    1px 1px 0 rgb(19 18 18 / 0.85);
+  --chrome-text-glow: 0 0 6px var(--chrome-accent-glow);
+
+  /*
+   * ===== Glow scale =====
+   * Five rungs of theme-tinted bloom that on-glass elements draw
+   * from. Each rung is a complete text-shadow stack; consumers pick
+   * a rung by referencing the token.
+   *
+   *   xs   barely-there pixel haze; for body text on glass
+   *   sm   a soft halo around small labels and chip pills
+   *   md   medium bloom; row labels, important readouts
+   *   lg   bright bloom; chip "lit" state on a busy screen
+   *   xl   beacon; wordmarks, hero headings
+   *
+   * Components below declare their own `--chrome-<comp>-glow`
+   * variables that default to one of these rungs — overriding the
+   * component variable on a single element (inline style or
+   * className) overrides that element's glow without touching the
+   * rest of the family.
+   */
+  --chrome-glow-xs:
+    0 0 2px var(--theme-lit-glow);
+  --chrome-glow-sm:
+    0 0 4px var(--theme-lit-glow);
+  --chrome-glow-md:
+    0 0 4px var(--theme-lit-glow),
+    0 0 10px var(--theme-lit-glow);
+  --chrome-glow-lg:
+    0 0 4px var(--theme-lit-edge),
+    0 0 12px var(--theme-lit-glow),
+    0 0 24px var(--theme-lit-glow);
+  --chrome-glow-xl:
+    0 0 2px var(--theme-lit-bright),
+    0 0 8px var(--theme-lit-edge),
+    0 0 18px var(--theme-lit-edge),
+    0 0 36px var(--theme-lit-glow),
+    0 0 64px var(--theme-lit-glow);
+
+  /*
+   * Per-component glow defaults. Override these on a single element
+   * (e.g. `style={{ '--screen-chip-glow-lit': 'var(--chrome-glow-lg)' }}`)
+   * to tune one element without restyling the class.
+   */
+  --screen-readout-glow: var(--chrome-glow-md);
+  --screen-row-glow: var(--chrome-glow-md);
+  --screen-chip-glow-lit: var(--chrome-glow-sm);
+  --screen-chip-glow-alt: 0 0 4px oklch(0.86 0.18 calc(var(--theme-hue) + 140) / 0.45);
+  --screen-text-glow: var(--chrome-glow-xs);
+
+  /*
+   * ===== Scrollbar tokens =====
+   * Same recessed-glass idiom as .screen-embedded / .hue-strip: a
+   * dark theme-tinted track that reads as a slot machined into the
+   * chassis, with a lit theme-hue thumb that glows the active color.
+   *
+   * Override per-element to dial a single scrollable region (e.g. a
+   * code block) up or down without restyling the global rule.
+   */
+  --chrome-scrollbar-size: 10px;
+  --chrome-scrollbar-track: oklch(0.10 0.025 var(--theme-hue));
+  --chrome-scrollbar-track-shadow:
+    inset 1px 0 2px rgb(0 0 0 / 0.55),
+    inset -1px 0 0 var(--chrome-screen-rim-catch);
+  --chrome-scrollbar-thumb: oklch(0.45 0.10 var(--theme-hue));
+  --chrome-scrollbar-thumb-hover: var(--theme-lit);
+  --chrome-scrollbar-thumb-glow:
+    0 0 4px var(--theme-lit-glow),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}

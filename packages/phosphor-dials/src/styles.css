@@ -1,0 +1,111 @@
+/*
+ * @ldlework/phosphor-dials — Row + Heading layout styles.
+ *
+ * Component-internal visual treatment comes from @ldlework/phosphor's
+ * own styles (slider, numberfield, dropdown, help). This file only
+ * styles the layout that dials' Panel composes around them: row
+ * spacing, the label/attach header strip, the nested sub-panel
+ * indentation rail.
+ *
+ * Uses phosphor tokens — no new variables defined here.
+ */
+
+.dials-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 6px);
+  color: var(--chrome-text, #d8d8e0);
+  font: 11px/1.4 ui-sans-serif, system-ui, sans-serif;
+}
+
+.pd-heading {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chrome-text-muted, rgba(216, 216, 224, 0.7));
+  padding: 4px 2px 6px;
+  border-bottom: 1px solid var(--chrome-divider, rgba(255, 255, 255, 0.08));
+}
+
+.pd-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 0;
+}
+
+.pd-row-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+}
+
+.pd-row-label {
+  flex: 0 0 auto;
+  font-weight: 500;
+  color: var(--chrome-text, #d8d8e0);
+}
+
+.pd-row-help {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Attach picker pushes to the right edge of the header. */
+.pd-row-attach {
+  flex: 1 1 auto;
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 4px;
+  align-items: center;
+}
+
+/*
+ * The control row hosts whatever the slot type renders. For numeric
+ * slots that's a Slider + NumberField in a single line — a 1fr grid
+ * column for the slider, an auto-width column for the number field.
+ */
+.pd-row-control {
+  display: block;
+}
+
+.pd-row-control [data-dials-number] {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.pd-row-control .chrome-numberfield {
+  width: 64px;
+}
+
+/* Read-only fallback for non-numeric slots with no custom editor. */
+.pd-row-control .dials-readonly {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--chrome-text-muted, rgba(216, 216, 224, 0.7));
+  padding: 2px 6px;
+  background: var(--chrome-recess, rgba(0, 0, 0, 0.3));
+  border-radius: 3px;
+}
+
+/*
+ * Nested sub-panel for an attached source's params. Indented and
+ * marked with a brand-hue rail so the recursion is unambiguous.
+ */
+.pd-row-nested {
+  margin-left: 10px;
+  padding: 6px 0 6px 10px;
+  border-left: 2px solid var(--theme-lit-bright, rgba(120, 200, 255, 0.5));
+  background: linear-gradient(
+    to right,
+    color-mix(in oklch, var(--theme-lit-bright, rgba(120, 200, 255, 1)) 6%, transparent),
+    transparent 40%
+  );
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 6px);
+}

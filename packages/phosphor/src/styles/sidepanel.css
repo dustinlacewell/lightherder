@@ -1,0 +1,123 @@
+/*
+ * .chrome-sidepanel — fixed chrome chassis docked to a viewport edge
+ * with a hanger toggle that pokes out of the opposite side.
+ *
+ * Layout: position: fixed; flex column so the toggle sits at the top
+ * and the body fills the rest. The toggle is absolutely positioned
+ * OUTSIDE the chassis (negative offset on the dock-opposite side),
+ * so when the whole chassis translates off-screen, the toggle moves
+ * with it but its negative offset keeps a small tab visible at the
+ * edge.
+ *
+ * The slide animation is a single transform on the chassis — the
+ * body, toggle, and visible chrome all travel as one rigid plate.
+ */
+
+.chrome-sidepanel {
+  --sidepanel-width: 380px;
+  --sidepanel-margin: 12px;
+  --sidepanel-toggle-size: 28px;
+  position: fixed;
+  top: var(--sidepanel-margin);
+  height: calc(100vh - var(--sidepanel-margin) * 2);
+  width: var(--sidepanel-width);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 60%, var(--chrome-slate-dark) 100%);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.022 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(180deg, rgb(150 150 150 / 0.08) 0%, rgb(11 11 11 / 0) 80%),
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 60%, var(--chrome-slate-dark) 100%);
+  background-size: 240px 240px, 100% 100%, 100% 100%;
+  border-radius: var(--chrome-panel-radius);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 6px 24px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgb(0 0 0 / 0.45);
+  color: var(--chrome-button-label);
+  transition: transform 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  pointer-events: auto;
+}
+
+/* Dock-edge anchoring + closed-state translation. */
+.chrome-sidepanel[data-side='right'] {
+  right: var(--sidepanel-margin);
+}
+.chrome-sidepanel[data-side='right'].is-closed {
+  transform: translateX(calc(100% + var(--sidepanel-margin)));
+}
+.chrome-sidepanel[data-side='left'] {
+  left: var(--sidepanel-margin);
+}
+.chrome-sidepanel[data-side='left'].is-closed {
+  transform: translateX(calc(-100% - var(--sidepanel-margin)));
+}
+
+/* ----- Toggle hanger ----- */
+
+.chrome-sidepanel-toggle {
+  position: absolute;
+  top: 16px;
+  width: var(--sidepanel-toggle-size);
+  height: calc(var(--sidepanel-toggle-size) + 8px);
+  background:
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  background-image:
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%),
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  color: var(--chrome-button-label);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  user-select: none;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 2px 6px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(0 0 0 / 0.45);
+  transition: color 200ms ease;
+}
+
+/* The hanger pokes OUT of the dock-opposite edge so it remains
+   reachable when the panel travels off-screen. */
+.chrome-sidepanel[data-side='right'] > .chrome-sidepanel-toggle {
+  right: 100%;
+  border-radius: 6px 0 0 6px;
+}
+.chrome-sidepanel[data-side='left'] > .chrome-sidepanel-toggle {
+  left: 100%;
+  border-radius: 0 6px 6px 0;
+}
+
+@media (hover: hover) {
+  .chrome-sidepanel-toggle:hover {
+    color: var(--chrome-button-label-hover);
+  }
+}
+
+.chrome-sidepanel-toggle:focus-visible {
+  outline: 2px solid var(--theme-lit-edge);
+  outline-offset: 2px;
+}
+
+.chrome-sidepanel-toggle-glyph {
+  font-size: 16px;
+  line-height: 1;
+  text-shadow: var(--chrome-text-emboss);
+}
+
+/* ----- Body ----- */
+
+.chrome-sidepanel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+}

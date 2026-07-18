@@ -1,0 +1,17 @@
+{
+  "name": "viz",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r --filter='./packages/*' --filter='./apps/*' run build",
+    "typecheck": "pnpm -r run typecheck",
+    "dev": "pnpm --filter @ldlework/phosphor-site run dev",
+    "storybook": "pnpm --filter @ldlework/phosphor-docs run storybook"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "devDependencies": {
+    "@ldlework/workmark": "*",
+    "typescript": "^5.6.3",
+    "zod": "^4.4.3"
+  }
+}

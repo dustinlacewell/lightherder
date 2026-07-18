@@ -1,0 +1,100 @@
+/*
+ * .chrome-help — small chrome-engraved "?" dot with a portaled popover.
+ *
+ * The trigger is a tiny neutral recessed well — a "?" stamped into
+ * chrome, not a display. The glyph is rendered in the chrome label
+ * color. The popover (rendered via React portal to document.body) is
+ * a chrome plate with bold title + body. Visibility is React-driven
+ * so the popover can escape any ancestor `overflow: hidden`.
+ *
+ * On hover/focus the dot stays neutral chrome; only the focus ring
+ * uses the theme accent (focus rings are a system-level signal, not
+ * a material light source).
+ */
+
+.chrome-help {
+  --help-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--help-size);
+  height: var(--help-size);
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 60%,
+      var(--chrome-slate-darkest) 0%,
+      var(--chrome-slate-dark) 100%
+    );
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 0.7),
+    inset 0 -1px 0 var(--chrome-rim-light),
+    0 0 0 1px rgb(0 0 0 / 0.6);
+  position: relative;
+  cursor: help;
+  user-select: none;
+  outline: none;
+  vertical-align: middle;
+}
+
+.chrome-help-glyph {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+  pointer-events: none;
+}
+
+.chrome-help:hover .chrome-help-glyph {
+  color: var(--chrome-button-label-hover);
+}
+
+.chrome-help:focus-visible {
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 0.7),
+    inset 0 -1px 0 var(--chrome-rim-light),
+    0 0 0 2px var(--theme-lit-edge);
+}
+
+/* ----- Portaled popover ----- */
+/*
+ * Lives at document.body level, positioned via inline `top`/`left`
+ * computed by the component from the trigger's bounding rect.
+ *
+ * The component sets data-placement="above" or "below" so the popover
+ * can be tweaked per direction if needed (today both look the same).
+ */
+.chrome-help-popover {
+  position: fixed;
+  z-index: 9999;
+  padding: 8px 10px;
+  background:
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 4px 16px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgb(0 0 0 / 0.5);
+  color: var(--chrome-button-label-hover);
+  font: 11px/1.45 ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: left;
+  text-shadow: none;
+  white-space: normal;
+  cursor: default;
+  pointer-events: none;
+}
+
+.chrome-help-popover strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--chrome-button-label-active);
+  font-weight: 700;
+  text-shadow: var(--chrome-text-emboss);
+}
+
+.chrome-help-popover span {
+  display: block;
+}

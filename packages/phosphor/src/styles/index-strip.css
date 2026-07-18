@@ -1,0 +1,112 @@
+/*
+ * .chrome-index-strip — instrument-panel index selector with action tiles.
+ *
+ * Layout:
+ *   - Outer flex row, full container width.
+ *   - .chrome-index-strip-screen takes the remaining left-side space
+ *     (flex-grow), hosts numbered chips on .screen-embedded glass.
+ *   - .chrome-index-strip-actions is a right-anchored cluster of
+ *     neutral chrome tiles. No flex-grow; tiles hug the right edge.
+ *
+ *   [ chip chip chip chip                                ]  [□][□][□]
+ *    └── flex-grow ─────────────────────────────────────┘   └─ fixed
+ */
+
+.chrome-index-strip {
+  --strip-h: 22px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+
+.chrome-index-strip-screen {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--strip-h);
+  padding: 0 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  /* .screen-embedded brings spill + chamfer + radius. */
+}
+.chrome-index-strip-screen::-webkit-scrollbar { display: none; }
+
+/* Compact numbered chip — tighter than ScrubChipRow's default chip
+   because index labels are tiny digits. */
+.screen-chip.chrome-index-chip {
+  padding: 0 6px;
+  min-width: 18px;
+  height: calc(var(--strip-h) - 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  flex: 0 0 auto;
+}
+
+/* Right-anchored chrome action tile cluster. */
+.chrome-index-strip-actions {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+/* One chrome tile — square, matches strip height. */
+.chrome-index-strip-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--strip-h);
+  height: var(--strip-h);
+  border: none;
+  padding: 0;
+  border-radius: var(--chrome-button-radius);
+  background:
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%),
+    linear-gradient(180deg, var(--chrome-slate-light) 0%, var(--chrome-slate-base) 100%);
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.15),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 1px 2px rgb(0 0 0 / 0.5);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition: color 200ms ease, box-shadow 150ms ease;
+  user-select: none;
+}
+
+@media (hover: hover) {
+  .chrome-index-strip-tile:not(:disabled):hover {
+    color: var(--chrome-button-label-hover);
+  }
+}
+
+.chrome-index-strip-tile:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 3px rgb(0 0 0 / 0.55),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06);
+}
+
+.chrome-index-strip-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.chrome-index-strip-tile:focus-visible {
+  outline: 2px solid var(--theme-lit-edge);
+  outline-offset: 2px;
+}

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+storybook-static/
+*.tsbuildinfo
+
+# Caches
+.turbo/
+.cache/
+.parcel-cache/
+.vite/
+.eslintcache
+coverage/
+*.tgz
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+*.local
+
+# Per-user Claude Code settings (settings.json is shared)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

@@ -1,0 +1,76 @@
+import { Meta } from '@storybook/blocks'
+
+<Meta title="Phosphor/Intro" />
+
+# Phosphor
+
+A React design system in the shape of late-80s / early-90s high-end audio
+equipment. Two material languages, layered:
+
+- **Chrome chassis.** Milled aluminum plates, rolled chamfers, rim catch-light,
+  sanded grain. Every raised object is built from one substrate (`.chrome-raised`)
+  so Panels, PushButtons, and Display chassis share the same depth illusion.
+- **OLED glass.** Recessed dark Screen, optionally framed by a black Bezel and
+  a chrome Lip. Nothing physical lives on the glass — every element is an
+  emitted-light pixel in the active theme hue.
+
+## OLED-family vocabulary
+
+The OLED-shaped primitives share a small set of structural concepts:
+
+- **Panel** — chrome plate; the chassis everything else mounts on.
+- **Lip** — chrome chamfer surrounding an embedded display.
+- **Bezel** — black ring framing a Screen. Configurable thickness.
+- **Screen** — dark glass with theme-tinted Spill (the bloom from holographic
+  content onto the unlit back panel). Building block — never used bare.
+- **EmbeddedScreen** — Screen with its own chamfer. For mounting bare on a
+  Panel without a Lip/Bezel (SegmentedDisplay, HueStrip).
+
+A `Display` is the canonical `Lip · Bezel · Screen` composition. A bare
+`EmbeddedScreen` is what SegmentedDisplay and HueStrip render as.
+
+## Theming
+
+One CSS variable drives the whole palette. Try setting it on `:root`:
+
+```css
+:root { --theme-hue: 30; /* amber */ }
+:root { --theme-hue: 145; /* phosphor green */ }
+:root { --theme-hue: 320; /* magenta */ }
+```
+
+Colour math is OKLCH, so perceptual brightness stays constant as you sweep
+hues. The active hue value is also picked up live by every primitive — the
+`HueStrip` story drives it interactively.
+
+## Primitives
+
+- **Panel** — raised chrome plate
+- **Display** — chrome Lip + black Bezel + dark Screen (canonical OLED chassis)
+- **PushButton** — three-layer pushable button
+- **Modal** — backdrop + frame for hosting a Display as a dialog
+- **LeverSwitch** — two-position 3D rocker
+- **SegmentedDisplay** — bare embedded screen with DSEG7 segmented digits
+- **ScrubChipRow** — horizontal screen-chip row with drag-to-scrub
+- **ChipToggle** — on-screen lit/unlit chip
+- **HueStrip** — bare embedded screen rendering a 360° OKLCH hue picker
+- **CodeBlock** — Display rendering syntax-highlighted source
+
+## Composing
+
+The system is opinionated about layering. From outermost to innermost:
+
+```
+Modal
+└─ Display (Lip · Bezel · Screen)
+   ├─ display-header  (chrome — embedded controls)
+   ├─ Screen          (only emitted-light pixels)
+   │  ├─ ChipToggle / screen-chip rows
+   │  ├─ screen-rows (label/value)
+   │  └─ HueStrip
+   └─ display-footer  (chrome — secondary controls)
+```
+
+Don't put physical-looking widgets (PushButton, LeverSwitch, SegmentedDisplay)
+*inside* the Screen — they break the conceit. Put them in the header, footer,
+or on a surrounding Panel.

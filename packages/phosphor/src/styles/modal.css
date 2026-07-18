@@ -1,0 +1,37 @@
+/*
+ * Modal — full-viewport dim backdrop with a centered content wrapper.
+ * Hosts a Display (or any other phosphor primitive) as the dialog;
+ * has no chrome of its own beyond the backdrop tint and a fade-in.
+ *
+ * The Display IS the modal: the conceit is that the user paused into
+ * a lit-pixel surface, not that a separate "dialog chrome" sits over
+ * the screen.
+ *
+ * On-screen content classes (.screen-row, .screen-rows, .screen-divider,
+ * etc.) live in display.css since they're not modal-specific — any
+ * piece of lit-pixel content on glass uses them.
+ */
+
+.chrome-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  /* Soft black-out so what's underneath stays barely-visible — reads
+     as "paused behind this," not "different screen." */
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: chrome-modal-fadeIn 140ms ease-out;
+}
+
+@keyframes chrome-modal-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.chrome-modal-frame {
+  /* Cap width so the Display reads as a unit, not a banner. */
+  width: min(560px, calc(100vw - 48px));
+}

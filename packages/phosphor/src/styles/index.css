@@ -1,0 +1,26 @@
+/*
+ * The single import. Bundled into dist/styles.css by Vite library
+ * mode; consumers do:
+ *
+ *   import '@ldlework/phosphor/styles.css'
+ */
+
+/* DSEG7-Classic — open-source 7-segment numerals. Used by
+   SegmentedDisplay to render numbers as real LED segments. The
+   regular weight is sufficient; lit-segment / unlit-segment subsets
+   exist but we paint the unlit ghost via opacity instead. */
+@import '@fontsource/dseg7-classic/400.css';
+
+@import './theme.css';
+@import './tokens.css';
+@import './chrome.css';
+@import './display.css';
+@import './modal.css';
+@import './codeblock.css';
+@import './slider.css';
+@import './numberfield.css';
+@import './dropdown.css';
+@import './help.css';
+@import './tabs.css';
+@import './sidepanel.css';
+@import './index-strip.css';

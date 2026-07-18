@@ -1,0 +1,70 @@
+/*
+ * Hue-driven theme system.
+ *
+ * One knob (--theme-hue) drives every accent in the design system.
+ * Saturation/chroma and lightness modifiers are FIXED here so the
+ * brand stays coherent across hues — only the hue changes when the
+ * theme is swapped.
+ *
+ * Color space: OKLCH. Picked over HSL because perceptual brightness
+ * stays roughly constant across hues — "tonic" reads equally bright
+ * at hue=30 (amber), hue=200 (cyan), hue=320 (magenta). HSL would
+ * make yellow ~30% brighter than blue at the same L, breaking the
+ * visual hierarchy when re-themed.
+ *
+ * Lightness rationale (chosen empirically against the OLED bezel):
+ *   --theme-lit          0.78  — full lit, the "on" pixel
+ *   --theme-lit-bright   0.86  — hover/highlight tint
+ *   --theme-lit-dim                   ~0.78 with α 0.22  — secondary lit
+ *   --theme-lit-faint                 ~0.78 with α 0.08  — barely lit
+ *   --theme-lit-on       0.18  — text color on a lit fill
+ *
+ * Chroma is held at 0.16 across all variants; that's the sweet spot
+ * where saturation reads as "lit display" without clipping into
+ * out-of-gamut at hue extremes.
+ */
+
+:root {
+  /* Default hue: 82 (a yellow-green near the phosphor-display sweet spot).
+     Override at runtime via
+     document.documentElement.style.setProperty('--theme-hue', <0..360>). */
+  --theme-hue: 82;
+
+  /* Fixed across the brand. */
+  --theme-chroma: 0.16;
+
+  /* Realised colors. Every accent token in the system reads from
+     these — never hard-code an OKLCH or hex elsewhere. */
+  --theme-lit: oklch(0.78 var(--theme-chroma) var(--theme-hue));
+  --theme-lit-bright: oklch(0.86 var(--theme-chroma) var(--theme-hue));
+  --theme-lit-dim: oklch(0.78 var(--theme-chroma) var(--theme-hue) / 0.22);
+  --theme-lit-faint: oklch(0.78 var(--theme-chroma) var(--theme-hue) / 0.08);
+  --theme-lit-glow: oklch(0.78 var(--theme-chroma) var(--theme-hue) / 0.18);
+  --theme-lit-edge: oklch(0.78 var(--theme-chroma) var(--theme-hue) / 0.45);
+  --theme-lit-trace: oklch(0.78 var(--theme-chroma) var(--theme-hue) / 0.06);
+
+  /* Text color rendered ON a lit fill — dark, slightly tinted toward
+     the hue so it reads as the same material rather than pure black. */
+  --theme-lit-on: oklch(0.18 0.05 var(--theme-hue));
+
+  /* Unlit OLED pixel base — almost-black with a tiny chroma whisper
+     so dark wedges feel hue-aware without reading as colored. Three
+     tiers so a stack of concentric segments (outer → inner) can read
+     as a luminance gradient: brightest outside, deepest at the core. */
+  --theme-pixel-off: oklch(0.13 0.02 var(--theme-hue));
+  --theme-pixel-off-deep: oklch(0.10 0.018 var(--theme-hue));
+  --theme-pixel-off-deepest: oklch(0.07 0.015 var(--theme-hue));
+
+  /* Lit tonic — three lightness steps for stacked-segment trios so
+     the column reads as one selection with an inner-darker
+     gradient, matching the off-pixel tiers above. Chroma is held
+     constant; only L changes. */
+  --theme-lit-strong: oklch(0.82 var(--theme-chroma) var(--theme-hue));
+  --theme-lit-mid: oklch(0.72 var(--theme-chroma) var(--theme-hue));
+  --theme-lit-soft: oklch(0.62 var(--theme-chroma) var(--theme-hue));
+
+  /* A label color for unlit wedges — dim version of the hue. */
+  --theme-label-dim: oklch(0.78 0.12 var(--theme-hue) / 0.45);
+  --theme-label-dimmer: oklch(0.78 0.12 var(--theme-hue) / 0.32);
+  --theme-label-faintest: oklch(0.78 0.12 var(--theme-hue) / 0.18);
+}

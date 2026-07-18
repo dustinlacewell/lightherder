@@ -1,0 +1,534 @@
+/*
+ * OLED-family vocabulary:
+ *
+ *   Panel           chrome plate; chassis. (Defined in chrome.css.)
+ *
+ *   Lip             chrome chamfer around an embedded display. Carries
+ *                   the screen-light effects on the chrome side of the
+ *                   interface: outer Catch, manufactured Seam-dark,
+ *                   ambient Haze. Fixed thickness.
+ *
+ *   Bezel           black ring framing a Screen. Carries the screen-light
+ *                   effect on the black-ring side: own inner-edge Rim.
+ *                   Configurable thickness via --bezel-thickness.
+ *
+ *   Screen          building block — back panel + Spill + Recess depth
+ *                   shading. No rim-light, no chamfer, no opinion about
+ *                   what's around it. Composes inside Bezel/Lip.
+ *
+ *   EmbeddedScreen  Screen + own chamfer recipe. For bare mounting on a
+ *                   Panel without a Bezel or Lip. Used by SegmentedDisplay
+ *                   and HueStrip.
+ *
+ *   Display         canonical Lip · Bezel · Screen composition with
+ *                   optional Header / Footer / Readout slots. Used by
+ *                   the OLED display chassis and by CodeBlock.
+ *
+ * Effect recipes (--spill, --recess, --bezel-rim, --lip-catch,
+ * --lip-seam, --lip-haze, --embedded-chamfer) live in tokens.css so
+ * the cherished visuals have first-class named identities.
+ */
+
+/* ============================================================
+ * .lip — chrome chamfer surrounding an embedded display.
+ *
+ * Built on .chrome-raised so the chrome itself (front face, edge,
+ * shadow) comes from the shared substrate. The Lip's *own* job is
+ * to paint the screen-light effects on the chrome side of the
+ * Lip↔Bezel interface — the outer rim-Catch where chrome chamfers
+ * down to meet the bezel, the manufactured Seam-dark hairline, and
+ * the broad ambient Haze washing the surrounding chrome from the
+ * screen's emitted light.
+ *
+ * These three outward effects land on the chrome AROUND the bezel
+ * because the bezel sits inside the lip's padding — so the lip's
+ * shadows paint onto its own chrome face. Today the bezel hosted
+ * these via outset shadows that landed on the surrounding chrome;
+ * lifting them to the lip is structurally honest (the chrome is
+ * what catches the light).
+ *
+ * The 10px padding is the chrome thickness AROUND the bezel inside
+ * the lip — fixed, since this is structural (the chamfer needs
+ * room to read as chrome chamfering down into the bezel ring).
+ * ============================================================ */
+.lip {
+  --raised-radius: 12px;
+  --raised-thrust: -3px;
+  --raised-shadow-y: 3px;
+  --raised-front-bg: var(--chrome-panel-bg);
+
+  /* Flex column so the Bezel inside can `flex: 1` to fill the lip's
+     content area. A block-display lip would force the bezel back
+     to content-height regardless of the bezel's own flex declarations. */
+  display: flex;
+  flex-direction: column;
+  color: var(--chrome-button-label);
+  /* Chrome thickness around the bezel — enough to read as a real
+     plate hosting the screen with chamfer + emitted-light rim,
+     without pretending to be a control panel. */
+  padding: 10px;
+}
+
+.lip > .chrome-raised-front {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.022 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%),
+    var(--chrome-panel-bg);
+  background-size: 240px 240px, 100% 100%, 100% 100%;
+}
+
+/* ============================================================
+ * .bezel — black ring framing a Screen.
+ *
+ * A flat black box whose padding IS the ring thickness. The Screen
+ * sits inside that padding.
+ *
+ * Two paint jobs:
+ *
+ *   1. The bezel's own inner Rim at the bezel↔screen interface
+ *      (--bezel-rim). Painted via a ::before pseudo-element
+ *      positioned to fill the inner content area of the bezel (just
+ *      outside the Screen) — inset shadows on the bezel box itself
+ *      would land at the OUTER edge of the bezel padding, not the
+ *      INNER edge where the seam actually is. The pseudo lands the
+ *      inset right at the inner edge, on top of the black ring,
+ *      reading as a faint theme-tinted hairline catching screen-light.
+ *
+ *   2. The Lip's three outward effects (--lip-seam, --lip-catch,
+ *      --lip-haze) as outset box-shadows on .bezel itself. These
+ *      paint OUTWARD onto the surrounding chrome face — conceptually
+ *      they belong to the Lip (the chrome around the bezel), but
+ *      the bezel's outer edge IS the bezel↔chrome seam, so outsets
+ *      from the bezel land precisely on the chrome we want to tint.
+ *
+ * Configurable thickness via --bezel-thickness (defaults to the
+ * standard OLED ring in tokens.css). Override per-instance for thin
+ * bezels (HueStrip) or thicker.
+ * ============================================================ */
+.bezel {
+  position: relative;
+  /* Flex column so the Screen inside can `flex: 1` to fill the
+     bezel's content area. */
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-screen-rim-color);
+  padding: var(--bezel-thickness);
+  border-radius: 8px;
+  /* Lip's outward effects — outset onto surrounding chrome. */
+  box-shadow:
+    var(--lip-seam),
+    var(--lip-catch),
+    var(--lip-haze);
+}
+
+/* Bezel's own inner rim-light at the bezel↔screen seam.
+   Absolute-positioned to fill the inner content area (the screen
+   slot), so its inset shadow lands at the seam where black ring
+   meets glass. z-index above the Screen (which is z:3 from the
+   chrome-raised content rule) so the 1px hairline paints on top
+   of the screen's bottom edge — same visual position the original
+   `inset 0 -1px 0` on `.chrome-oled-screen` had. pointer-events:none
+   so it doesn't intercept clicks on the Screen inside. */
+.bezel::before {
+  content: '';
+  position: absolute;
+  inset: var(--bezel-thickness);
+  z-index: 4;
+  box-shadow: var(--bezel-rim);
+  pointer-events: none;
+  /* Match the Screen's border-radius so the rim curves correctly
+     at the corners. Screen has 4px; if a consumer overrides it,
+     the rim hairline will visibly mis-clip — kept in lockstep here
+     for the canonical case. */
+  border-radius: 4px;
+}
+
+/* ============================================================
+ * .screen — pure dark glass surface. Building block only.
+ *
+ * Back panel + Spill (theme-tinted bloom over unlit black). Recess
+ * depth shading for the "set into its host" cue. No rim-light, no
+ * chamfer, no padding — pure substrate. The composer wrapping the
+ * Screen decides padding around content.
+ *
+ * Always used inside a Bezel/Lip (which paint the interface rim
+ * effects) or inside an EmbeddedScreen wrapper (which carries the
+ * combined chamfer recipe). Never rendered bare in user-facing
+ * positions because there's nothing painting the chrome↔screen
+ * interface.
+ * ============================================================ */
+.screen {
+  position: relative;
+  border-radius: 4px;
+  background: var(--spill);
+  box-shadow: var(--recess);
+  /* No padding. Content padding is the composer's choice — Display
+     gives a default, CodeBlock zeroes it for the bezel-as-padding
+     case, an oscilloscope demo zeroes it to bleed to the screen edge. */
+}
+
+/* ============================================================
+ * .screen-embedded — Screen with its own chamfer recipe.
+ *
+ * For mounting a Screen directly in a chrome host (e.g. a Panel)
+ * without a separate Bezel or Lip. The single --embedded-chamfer
+ * shadow stack collapses all four interface effects (outer catch,
+ * seam-dark, inner highlight, recess depth) onto the screen's own
+ * box-shadow, because no other element is positioned to paint them.
+ *
+ * Used by SegmentedDisplay (small digit readout) and HueStrip
+ * (recessed hue picker slot). Both sit directly on a Panel.
+ *
+ * Inherits the Screen's Spill + back panel; the --recess from .screen
+ * is overridden by --embedded-chamfer (which includes its own inset
+ * top-shadow for the recess depth).
+ * ============================================================ */
+.screen-embedded {
+  position: relative;
+  border-radius: var(--chrome-bezel-radius);
+  background: var(--spill);
+  box-shadow: var(--embedded-chamfer);
+}
+
+/* ============================================================
+ * .display — canonical Lip · Bezel · Screen composition.
+ *
+ * Markup:
+ *
+ *   <div class="display lip chrome-raised">
+ *     <span class="chrome-raised-shadow"></span>
+ *     <span class="chrome-raised-edge"></span>
+ *     <span class="chrome-raised-front"></span>
+ *     [optional .display-header]
+ *     <div class="bezel">
+ *       <div class="screen">
+ *         <!-- on-glass content -->
+ *       </div>
+ *     </div>
+ *     [optional .display-footer]
+ *   </div>
+ *
+ * The .display class itself carries no painting — it's the marker
+ * class for "this Lip wraps a Bezel + Screen composition." All the
+ * actual visual effects are owned by .lip, .bezel, .screen, and the
+ * chrome-raised substrate spans. Kept as a hook in case future
+ * variants (.display[data-variant='compact'], etc.) need a place
+ * to attach overrides.
+ * ============================================================ */
+
+/* ============================================================
+ * Header / footer chrome strips on the Display chassis.
+ *
+ * These live on the chrome plate (Lip), not on the OLED glass —
+ * this is where embedded controls (key displays, dropdowns, status
+ * rows) mount. position:relative + z-index:3 lifts them above the
+ * chrome-raised substrate spans which fill the whole chassis.
+ * ============================================================ */
+.display-header,
+.display-footer {
+  position: relative;
+  z-index: 3;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ============================================================
+ * On-screen content classes — lit typography on glass.
+ *
+ * These compose inside a Screen and assume "emitted-light pixel"
+ * visual conventions: small caps, theme-hue, soft glow. They work
+ * inside any Screen (a Display's Screen, an EmbeddedScreen, etc.).
+ * No chrome anywhere inside.
+ * ============================================================ */
+
+/* Slotted readout row floating over the glass — absolute positioning
+   pins it to the top-right of its Screen parent. */
+.screen-readout {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 5;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--theme-lit-bright);
+  text-shadow: var(--screen-readout-glow);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* A vertical stack of label/value rows, the kind a settings panel
+   would render on the OLED screen. */
+.screen-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Single label-and-value row on the screen. */
+.screen-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--theme-lit-bright);
+  text-shadow: var(--screen-row-glow);
+}
+
+.screen-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Fixed-width numeric readout opposite the label so digit-width
+   changes don't shift the row. */
+.screen-row-readout {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--theme-lit-bright);
+  text-shadow: var(--screen-row-glow);
+  white-space: nowrap;
+  min-width: 5.5rem;
+  text-align: right;
+}
+
+/* Thin theme-tinted divider for use inside the screen. */
+.screen-divider {
+  height: 1px;
+  margin: 12px 0;
+  background: oklch(0.78 0.04 var(--theme-hue) / 0.18);
+}
+
+/* Generic chip row on the glass. Used for in-display controls. */
+.screen-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
+  flex-wrap: wrap;
+}
+
+/* One control chip on the screen — fixed slot, two states.
+   Lit: glowing pill in the active theme hue.
+   Unlit: phantom outline with the letterforms barely visible,
+   the way an unlit LCD segment still casts a faint shadow on glass.
+   Both states reserve identical box dimensions so the layout never
+   shifts when state toggles. */
+.screen-chip {
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.14em;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    color 200ms ease,
+    background 200ms ease,
+    border-color 200ms ease,
+    text-shadow 200ms ease;
+}
+
+/* Width-stable chip body. The sizer holds both labels stacked
+   (hidden); the visible label sits in the same grid cell so toggling
+   state doesn't resize the chip. */
+.screen-chip-sized {
+  position: relative;
+  display: inline-grid;
+  grid-template-areas: 'cell';
+  align-items: center;
+  justify-items: center;
+}
+
+.screen-chip-sizer {
+  grid-area: cell;
+  display: inline-grid;
+  grid-template-areas: 'a';
+  visibility: hidden;
+}
+
+.screen-chip-sizer > span {
+  grid-area: a;
+  white-space: nowrap;
+}
+
+.screen-chip-visible {
+  grid-area: cell;
+  white-space: nowrap;
+}
+
+.screen-chip[data-lit='true'] {
+  background: oklch(0.78 0.16 var(--theme-hue) / 0.12);
+  color: var(--theme-lit);
+  text-shadow: var(--screen-chip-glow-lit);
+  border-color: oklch(0.78 0.16 var(--theme-hue) / 0.25);
+}
+
+.screen-chip[data-lit='false'] {
+  background: transparent;
+  color: oklch(0.78 0.04 var(--theme-hue) / 0.18);
+  text-shadow: none;
+  border-color: oklch(0.78 0.04 var(--theme-hue) / 0.08);
+}
+
+/* Secondary lit state. Tri-state chips use this to mark a
+   meaningfully different active without leaving the theme entirely.
+   Hue offset 140° from the theme accent. */
+.screen-chip[data-lit='alt'] {
+  background: oklch(0.78 0.16 calc(var(--theme-hue) + 140) / 0.14);
+  color: oklch(0.86 0.18 calc(var(--theme-hue) + 140));
+  text-shadow: var(--screen-chip-glow-alt);
+  border-color: oklch(0.78 0.16 calc(var(--theme-hue) + 140) / 0.3);
+}
+
+@media (hover: hover) {
+  .screen-chip[data-lit='alt']:hover {
+    color: oklch(0.92 0.2 calc(var(--theme-hue) + 140));
+  }
+  .screen-chip[data-lit='false']:hover {
+    color: oklch(0.78 0.1 var(--theme-hue) / 0.55);
+    border-color: oklch(0.78 0.1 var(--theme-hue) / 0.3);
+  }
+  .screen-chip[data-lit='true']:hover {
+    color: var(--theme-lit-bright);
+  }
+}
+
+.screen-chip:focus-visible {
+  outline: 1px solid var(--theme-lit);
+  outline-offset: 2px;
+}
+
+.screen-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (hover: hover) {
+  .screen-chip:disabled:hover {
+    color: oklch(0.78 0.04 var(--theme-hue) / 0.18);
+    border-color: oklch(0.78 0.04 var(--theme-hue) / 0.08);
+  }
+}
+
+/* ============================================================
+ * .segdisplay — small recessed-glass digit display.
+ *
+ * Built on .screen-embedded (Screen + own chamfer). Uses DSEG7-Classic
+ * for real-looking segmented numerals. The "tone" attribute switches
+ * the glow color between the VU-green and the active theme hue.
+ * ============================================================ */
+.segdisplay {
+  /* Inherits .screen-embedded for the recess + rim treatment.
+     Inline-grid so the element shrinks to content like a text readout.
+     The single 1fr column lets a `width: 100%` from a consumer fill
+     the parent rather than collapsing to content width. */
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  grid-template-areas: 'cell';
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  /* Family name must match @fontsource/dseg7-classic's @font-face,
+     which uses a space, not a hyphen. */
+  font-family: 'DSEG7 Classic', var(--font-mono, monospace);
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+  min-width: 4.5ch;
+}
+
+.segdisplay-ghost,
+.segdisplay-lit {
+  grid-area: cell;
+  text-align: right;
+  white-space: pre;
+}
+
+/*
+ * Lit + ghost glyph color both derive from --display-color so the
+ * digits match the rest of the chamfer family (rim catch, body tint,
+ * spill, bezel rim — all chained off the same token). Consumers
+ * override --display-color via SegmentedSurface's `color` prop or
+ * any other CSS scope; everything in this scope re-tints together.
+ */
+.segdisplay-ghost {
+  color: var(--display-color);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.segdisplay-lit {
+  color: var(--display-color);
+  text-shadow:
+    0 0 4px color-mix(in oklch, var(--display-color) 55%, transparent),
+    0 0 10px color-mix(in oklch, var(--display-color) 35%, transparent);
+}
+
+/* ============================================================
+ * .hue-strip — 360° hue picker recessed into chrome.
+ *
+ * An .screen-embedded with a custom slim height. The OKLCH rainbow
+ * gradient is applied inline by the React component (stops are
+ * computed at render time). The slim height and override of the
+ * default border-radius give it the "recessed slot" look rather
+ * than a square instrument-glass.
+ * ============================================================ */
+.hue-strip {
+  position: relative;
+  height: 2.5rem;
+  width: 100%;
+  /* Inherits border-radius + box-shadow from .screen-embedded; the
+     gradient itself is applied inline because its stops are computed
+     at render time. */
+  cursor: pointer;
+  user-select: none;
+}
+
+.hue-strip:focus-visible {
+  outline: 2px solid var(--theme-lit);
+  outline-offset: 3px;
+}
+
+.hue-strip-thumb {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 3rem;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: oklch(0.95 0.02 var(--theme-hue));
+  box-shadow:
+    0 0 0 2px rgb(0 0 0 / 0.6),
+    0 0 8px oklch(0.78 0.16 var(--theme-hue) / 0.7);
+  pointer-events: none;
+}
+
+/* While the user is actively dragging the hue strip, suppress the
+   color/background/text-shadow transitions on every theme-reactive
+   chrome element. Without this, every theme-hue tick sets up a 200ms
+   interpolation toward the new color and the next tick interrupts it
+   mid-flight — the user sees "everything lags behind the slider." */
+:root[data-theme-dragging='true'] .chrome-button,
+:root[data-theme-dragging='true'] .screen-chip,
+:root[data-theme-dragging='true'] .chrome-select {
+  transition: none !important;
+}

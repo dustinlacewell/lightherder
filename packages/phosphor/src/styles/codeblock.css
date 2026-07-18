@@ -1,0 +1,84 @@
+/* ============================================================
+ * .codeblock — code displayed on an OLED Display.
+ *
+ * Composes Display internally: Lip + Bezel + Screen, with the
+ * syntax-highlighted source on the Screen. The Bezel ring IS the
+ * OLED-style content padding around the code, so the inner
+ * .codeblock-pre wrapper has only minimal padding (enough so the
+ * code doesn't kiss the glass chamfer).
+ *
+ * Tokens are colored via CSS variables that derive from --theme-hue,
+ * matching the chrome brightness ladder used elsewhere:
+ *
+ *   bright (0.86): keyword, fn, tag, type   — "active control"
+ *   mid    (0.78): string, number, attr     — "lit, secondary"
+ *   plain  (0.72): variables, plain text    — "fg"
+ *   dim    (0.55): punctuation              — "fg-dim"
+ *   faint  (0.46): comment                  — "fg-faint, italic"
+ *
+ * Roles get small hue offsets so the eye separates them without
+ * leaving the theme's tonal family. The per-token glow halo is
+ * intentionally subtle — code is dense, and a strong per-character
+ * glow smears into unreadability.
+ * ============================================================ */
+
+:root {
+  --code-keyword: oklch(0.86 0.16 var(--theme-hue));
+  --code-fn:      oklch(0.86 0.14 calc(var(--theme-hue) + 18));
+  --code-type:    oklch(0.86 0.13 calc(var(--theme-hue) - 22));
+  --code-tag:     oklch(0.86 0.16 var(--theme-hue));
+
+  --code-string:  oklch(0.78 0.12 calc(var(--theme-hue) + 32));
+  --code-number:  oklch(0.78 0.11 calc(var(--theme-hue) - 40));
+  --code-attr:    oklch(0.78 0.10 calc(var(--theme-hue) + 12));
+
+  --code-plain:   oklch(0.72 0.04 var(--theme-hue));
+  --code-punct:   oklch(0.55 0.03 var(--theme-hue));
+  --code-comment: oklch(0.46 0.02 var(--theme-hue));
+
+  --code-glow:    oklch(0.78 0.12 var(--theme-hue) / 0.35);
+}
+
+/* The <pre> (fallback) or <div data-shiki> (highlighted) wrapper
+   holding the syntax-highlighted spans. Sits directly on the OLED
+   Screen (which has zero default padding). Small inner padding is
+   breathing room so the code doesn't touch the chamfer; the Bezel
+   ring provides the main visual frame around the code. */
+.codeblock-pre {
+  font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--code-plain);
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Shiki emits its own <pre> with an inline `style="background:..."`;
+   strip it with !important so the OLED Screen's Spill shows through.
+   Inline styles outweigh normal-specificity selectors, so !important
+   is the only way to win without elevating specificity higher than
+   the consumer might want for their own overrides. */
+.codeblock-pre pre {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
+}
+.codeblock-pre code {
+  background: transparent;
+  font-family: inherit;
+}
+
+/* Subtle phosphor halo behind every token. The low-chroma comment
+   and punct colors carry almost no visible glow, so dim text stays
+   crisp while bright keyword/string/fn tokens pick up the lit-pixel
+   treatment the rest of the chassis uses. */
+.codeblock-pre span {
+  text-shadow: 0 0 6px var(--code-glow);
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@ldlework/gl",
+  "version": "0.1.0",
+  "description": "WebGL2 substrate — programs, textures, framebuffers, geometry, pass orchestration, camera, dynamic vertex buffers.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./substrate": {
+      "types": "./dist/substrate/index.d.ts",
+      "import": "./dist/substrate/index.js"
+    },
+    "./camera": {
+      "types": "./dist/camera/index.d.ts",
+      "import": "./dist/camera/index.js"
+    },
+    "./dynamic-buffer": {
+      "types": "./dist/dynamic-buffer/index.d.ts",
+      "import": "./dist/dynamic-buffer/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
+  }
+}

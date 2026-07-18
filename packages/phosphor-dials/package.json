@@ -1,0 +1,40 @@
+{
+  "name": "@ldlework/phosphor-dials",
+  "version": "0.0.1",
+  "description": "Phosphor-styled component set for @ldlework/dials' Panel. Pass `dialPanelComponents` to <Panel components={...}> and the dial tree renders in the phosphor design language.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/copy-styles.mjs",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "peerDependencies": {
+    "@ldlework/dials": "*",
+    "@ldlework/phosphor": "*",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@ldlework/dials": "workspace:*",
+    "@ldlework/phosphor": "workspace:*",
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
+  }
+}

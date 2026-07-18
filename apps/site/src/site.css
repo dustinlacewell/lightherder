@@ -1,0 +1,635 @@
+/*
+ * Site-level layout + typography. The library brings the chrome and
+ * glass; this brings the surrounding page furniture (background,
+ * type scale, section rhythm).
+ */
+
+:root {
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+
+  /*
+   * Site palette is hue-locked to --theme-hue so the page, the chrome,
+   * and the lit pixels all live in one OKLCH world. Drag the HueStrip
+   * and the room recolours with the units; nothing fights anything.
+   *
+   * Chroma is intentionally *very* low (0.02–0.03) — the room is
+   * tinted, not coloured. The lit pixels carry the saturation.
+   */
+  --site-bg: oklch(0.13 0.025 var(--theme-hue));
+  --site-bg-deep: oklch(0.08 0.02 var(--theme-hue));
+
+  --site-fg: oklch(0.88 0.012 var(--theme-hue));
+  --site-fg-dim: oklch(0.68 0.018 var(--theme-hue));
+  --site-fg-faint: oklch(0.48 0.014 var(--theme-hue));
+
+  /* Section separator: a hue-tinted hairline rather than a flat grey. */
+  --site-rule: oklch(0.78 0.04 var(--theme-hue) / 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+ * Global containment rules — first principles.
+ *
+ * Flex and grid children default to `min-width: auto`, i.e. their
+ * min-content size. When that content has an intrinsic width (a
+ * 7-seg DSEG display, a fixed-font code block, an inline image),
+ * that pixel value bubbles up the tree and pushes EVERY ancestor
+ * wider than the viewport. The fix is structural: every flex item
+ * and grid track that hosts shrinkable content must declare
+ * `min-width: 0` (or `minmax(0, …)` for grid tracks).
+ *
+ * Below: blanket containment for the site's layout primitives.
+ * Component-level rules add `min-width: 0` to their own flex/grid
+ * children at the point of declaration; this rule is the safety
+ * net for ad-hoc layout in App.tsx and friends.
+ * ============================================================ */
+.site,
+.site-container,
+.site-section,
+.site-row,
+.site-row-demo,
+.site-row-text,
+.site-features-grid {
+  min-width: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--site-bg);
+  color: var(--site-fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  /* Belt-and-suspenders against rogue overflow from wordmarks,
+     code blocks, oscilloscope canvases, etc. Each component that
+     legitimately scrolls (.codeblock) does so locally. */
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--theme-lit-bright);
+  text-decoration: none;
+  text-shadow: 0 0 4px var(--theme-lit-glow);
+}
+
+a:hover { color: var(--theme-lit); }
+
+/* ============================================================
+ * Page rhythm
+ * ============================================================ */
+
+.site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-section {
+  width: 100%;
+  padding: 48px 24px;
+}
+
+/* Tighter gutters on phones so demos and code don't lose their
+   internal padding to the page margin. */
+@media (max-width: 600px) {
+  .site-section { padding: 36px 14px; }
+  .site-hero    { padding: 24px 14px; }
+}
+
+.site-container {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.site-section--narrow .site-container { max-width: 720px; }
+
+.site-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--theme-lit);
+  text-shadow: 0 0 4px var(--theme-lit-glow);
+  margin: 0 0 12px 0;
+}
+
+.site-h2 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px 0;
+  color: var(--site-fg);
+}
+
+.site-h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 0 0 6px 0;
+  color: var(--site-fg);
+}
+
+.site-prose {
+  color: var(--site-fg-dim);
+  max-width: 60ch;
+}
+
+.site-prose p { margin: 0 0 1em 0; }
+
+.site-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: oklch(0.78 0.04 var(--theme-hue) / 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--theme-lit-bright);
+}
+
+/* ============================================================
+ * Hero
+ * ============================================================ */
+
+.site-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* Padding here defines the side gutter for the stage — the stage
+     width is `100%` and fills the section content area exactly,
+     leaving 24px on each side. */
+  padding: 32px 24px;
+  overflow: hidden;
+}
+
+.site-hero-stage {
+  position: relative;
+  /* Fill the grid track's content area; the section's padding is
+     what determines the page margin. A max keeps the OLED from
+     ballooning on very wide viewports. */
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* On-glass stack inside the Screen.
+   Holds two layers that exactly overlap the glass: the oscilloscope
+   (absolute, bled to the bezel) and the wordmark (in flow, centred).
+   Since .screen has no default padding, the wrapper sits flush with
+   the bezel — its inner padding is its own choice. */
+.site-hero-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  height: clamp(220px, 32vw, 320px);
+  padding: 16px;
+  /* Clip everything to the screen rectangle — the wordmark glow and
+     the scope canvas both rely on this so they don't visually bleed
+     past the OLED glass into the chrome margin. */
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.site-hero-cta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Hero CTA chips override the default chip glow rung — they sit on
+   a busy screen (oscilloscope + wordmark bloom right next to them)
+   so they need a stronger halo than chips on a quiet readout. */
+.site-hero-cta-chip {
+  --screen-chip-glow-lit: var(--chrome-glow-md);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+/* On-glass dialog title — bigger and brighter than a row label,
+   but still lit-pixel typography (no chrome anywhere inside the
+   OLED). */
+.site-modal-title {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--theme-lit-bright);
+  text-shadow: var(--chrome-glow-md);
+  margin-bottom: 10px;
+}
+
+.site-modal-body {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  line-height: 1.55;
+  color: var(--theme-lit);
+  text-shadow: var(--chrome-glow-xs);
+  margin: 0 0 8px 0;
+  opacity: 0.85;
+}
+
+/* Label-on-chassis layout for grouped chassis controls — emboss
+   label on the left, the actual control(s) on the right, baseline
+   aligned. Used in the PushButton demo for action / toggle / radio. */
+.site-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.site-row-controls-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  min-width: 4rem;
+}
+
+/* ============================================================
+ * Weather glyph
+ *
+ * Single character in the DSEG Weather font. Family name must
+ * match the @font-face declaration in @fontsource/dseg-weather
+ * exactly — that one uses a space, not a hyphen. The glyph
+ * renders in whatever colour its parent sets.
+ * ============================================================ */
+.weather-glyph {
+  font-family: 'DSEG Weather', var(--font-mono, monospace);
+  line-height: 1;
+  display: inline-block;
+}
+
+/* ============================================================
+ * LabeledDisplay
+ *
+ * Small chassis-style label sitting above an embedded display.
+ * The label inherits the chrome-emboss treatment; the body just
+ * positions whatever display sits in it.
+ * ============================================================ */
+.labeled-display {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.labeled-display[data-align='center'] { align-items: center; }
+.labeled-display[data-align='end']    { align-items: flex-end; }
+.labeled-display[data-align='start']  { align-items: flex-start; }
+
+.labeled-display-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.labeled-display-body {
+  display: flex;
+  align-items: center;
+}
+
+/* SegmentedDisplay demo — Date / Time row at the top of the Panel.
+   Two intrinsic-width 7-segment displays. Wrap to stacked when the
+   row can't fit both side-by-side (narrow phones), so the displays
+   never push past the Panel's right edge. */
+.site-segdemo-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+/* ============================================================
+ * WeatherPanel inner layout.
+ *
+ * Used as both the lit and ghost layers of one big SegmentedSurface
+ * (the SegmentedDisplay primitive demo). Both layers render the
+ * exact same DOM shape so they overlay per-glyph; the colour and
+ * glow come from the SegmentedSurface's tone scoping.
+ *
+ * No `color` declared here — the surrounding `.segdisplay-lit`
+ * / `.segdisplay-ghost` set the layer's colour and opacity.
+ * ============================================================ */
+.weather-surface {
+  /* Forecast (left) takes whatever's left; temp/humidity (right)
+     sit at their natural content width. The forecast row's icon
+     font scales with its container width via the cqi unit, so
+     giving the left column 1fr means the icons get the lion's
+     share of the surface.
+
+     Both tracks use `minmax(0, …)` so neither track inherits its
+     children's min-content as a hard floor. The right column
+     prefers `auto` (its natural content width) but is allowed to
+     compress below that when the surface is narrower than the
+     readouts would naturally need — the DSEG numerals shrink
+     responsively via the .weather-surface-numeric clamp(). */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  gap: clamp(10px, 4cqi, 24px);
+  align-items: stretch;
+  /* The parent SegmentedSurface is `inline-grid` (a constraint from
+     .segdisplay's text-readout role); force width here so
+     the weather grid claims the full surface width regardless. */
+  width: 100%;
+  box-sizing: border-box;
+  /* Establish a container so child clamps can size off the surface
+     width, not the page width. The numerals and labels inside shrink
+     in lockstep with how much room the surface actually has. */
+  container-type: inline-size;
+}
+
+/* Left column: forecast label pinned top-left; icon row fills the
+   remaining height of the column. The column is an inline-size
+   container so the icon-row font scales off the column width,
+   not the surface width — keeps the icons inside their lane. */
+.weather-surface-forecast {
+  display: flex;
+  flex-direction: column;
+  /* Stretch (not flex-start) so children get the full column width.
+     The label is text-aligned left inside its stretched box; the
+     icon row stretches across the same width and centers icons
+     within it. */
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.weather-surface-forecast > .weather-surface-label {
+  text-align: left;
+}
+
+.weather-surface-forecast-row {
+  /* Three columns: icon | arrow | icon. The icons take 1fr each so
+     they share remaining space equally; the arrow is content-width
+     centred between them. The row claims the column's remaining
+     height. */
+  flex: 1;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  /* Scale the icon font off the column's inline size (container
+     query), capped so very wide cells don't go cartoonish. */
+  font-size: clamp(2rem, 38cqi, 6rem);
+  /* Stop intrinsic glyph width from feeding back into the grid. */
+  min-width: 0;
+  overflow: hidden;
+}
+
+.weather-surface-forecast-row .weather-glyph {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.weather-surface-arrow {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  line-height: 1;
+}
+
+/* Right column: temp + humidity stacked. Labels left-aligned, the
+   numeric + unit on a second line aligned the same way. */
+.weather-surface-readouts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.weather-surface-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.weather-surface-readout-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.weather-surface-label {
+  /* Block so the flex parent's `align-items: stretch` actually
+     gives the label full column width; otherwise the span collapses
+     to its text width and `text-align: left` can't do anything. */
+  display: block;
+  font-family: var(--font-mono);
+  font-size: clamp(0.48rem, 2.3cqi, 0.6rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.weather-surface-numeric {
+  font-family: 'DSEG7 Classic', var(--font-mono, monospace);
+  /* Scale the DSEG numerals to the surface width so they compress
+     instead of overflowing on narrow screens. cqi = % of container's
+     inline size; .weather-surface sets container-type: inline-size. */
+  font-size: clamp(0.85rem, 6cqi, 1.4rem);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.weather-surface-unit {
+  font-family: var(--font-mono);
+  font-size: clamp(0.62rem, 3cqi, 0.78rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.site-hero-scope {
+  position: absolute;
+  inset: 0;
+  /* Bumped from 0.55 — the trace needs to read clearly behind the
+     wordmark glow without competing with it. */
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.site-hero-wordmark {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  /* Sized to fit "PHOSPHOR" (8 chars + 7 letter-spacings) inside the
+     OLED at every viewport width. The OLED is min(880px, 100vw-32px)
+     wide, minus ~52px of bezel+padding ≈ available glass width. At
+     7.2vw font with 0.18em tracking the wordmark spans ~8.5em which
+     stays inside the glass from 320px through 880px+. */
+  font-size: clamp(1.6rem, 7.2vw, 4.6rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--theme-lit-bright);
+  /* Layered glow stack: a tight core flare that anchors the
+     letterforms against the scope behind them, then progressively
+     wider/softer halos that read as the emission of a real lit
+     display rather than an outline. The widest one (0 0 64px) is
+     where the marketing "this thing is glowing at you" lives. */
+  text-shadow:
+    0 0 2px var(--theme-lit-bright),
+    0 0 8px var(--theme-lit-edge),
+    0 0 18px var(--theme-lit-edge),
+    0 0 36px var(--theme-lit-glow),
+    0 0 64px var(--theme-lit-glow);
+  white-space: nowrap;
+  /* Offset the trailing letter-spacing so the run sits optically
+     centred (half a tracking unit shifted off the geometric centre). */
+  margin-left: 0.09em;
+}
+
+/* On-glass tagline inside the OLED. Reads as a faint emitted-light
+   subtitle under the wordmark — same family as the chip rows but
+   smaller, dimmer, with the glow scale's lowest rung. */
+.site-hero-tagline {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--theme-lit-bright);
+  text-shadow: var(--chrome-glow-xs);
+  opacity: 0.78;
+}
+
+.site-hero-tagline-link {
+  /* The brand name is the only fully-lit element in the line. */
+  color: var(--theme-lit);
+  text-shadow: var(--chrome-glow-sm);
+  text-decoration: none;
+  transition: color 200ms ease, text-shadow 200ms ease;
+}
+
+.site-hero-tagline-link:hover {
+  color: var(--theme-lit-bright);
+  text-shadow: var(--chrome-glow-md);
+}
+
+/* ============================================================
+ * Feature trio
+ * ============================================================ */
+
+.site-features-title {
+  /* Spans both columns of the grid below, anchoring the section's
+     headline above the parallel text + demo. */
+  margin-bottom: 20px;
+}
+
+.site-features-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+@media (min-width: 760px) {
+  .site-features-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+}
+
+/* ============================================================
+ * Demo + code rows
+ * ============================================================ */
+
+.site-row {
+  display: grid;
+  /* minmax(0, 1fr) — without the 0 floor the track defaults to
+     min-content and intrinsic-width children (demos, code blocks)
+     push the row wider than the viewport. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  /* Stretch so the demo cell takes the same height as the text cell
+     (typically taller — title + prose + code). Demos that don't
+     want to fill stretch their inner content, not the cell. */
+  align-items: stretch;
+  padding: 28px 0;
+  border-top: 1px solid var(--site-rule);
+}
+
+.site-row:first-of-type { border-top: none; }
+
+/* Stack rows until there's enough room for a real two-column layout
+   with a usable demo cell on each side. Anything below this is too
+   narrow to host an OLED demo *next to* a paragraph of prose — the
+   text wraps to 3 lines and the demo gets squashed below its
+   minimum, so stacking reads better. */
+@media (min-width: 720px) {
+  .site-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; }
+  .site-row[data-side='right'] .site-row-demo { order: 2; }
+  .site-row[data-side='right'] .site-row-text { order: 1; }
+}
+
+.site-row-demo {
+  /* Stretch both axes so a Panel set to width:100%; height:100% fills
+     the whole cell. Smaller demos (a lone PushButton, a SegmentedDisplay)
+     centre themselves via their own inner flex layout. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  min-height: 120px;
+}
+
+.site-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.site-row-title {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  color: var(--theme-lit-bright);
+  text-shadow: 0 0 4px var(--theme-lit-glow);
+  margin: 0;
+}
+
+/* ============================================================
+ * Footer
+ * ============================================================ */
+
+.site-footer {
+  margin-top: auto;
+  padding: 48px 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--site-fg-faint);
+  border-top: 1px solid var(--site-rule);
+}
+
+.site-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 8px;
+}

@@ -1,0 +1,463 @@
+/*
+ * Element-level chrome styles. Tokens live in tokens.css; component
+ * markup applies these classes. Authored as plain CSS rather than
+ * utility classes because the look is built from gradient/shadow
+ * stacks that aren't ergonomic to compose inline.
+ *
+ * OLED-family classes (.lip, .bezel, .screen, .screen-embedded,
+ * .display, .segdisplay, .hue-strip, on-screen content) live in
+ * display.css. This file is everything ELSE: the shared raised
+ * substrate, Panel, PushButton, LeverSwitch, and Select.
+ */
+
+/* ============================================================
+ * .chrome-raised — the shared 3-layer raised-object substrate.
+ *
+ * Both panels and push buttons are built from the same construction:
+ * a dark shadow layer dropped down, a dark edge layer at rest, and a
+ * lifted front face holding the content. The shared substrate keeps
+ * the depth illusion identical across primitives.
+ *
+ * Markup contract:
+ *   <div class="chrome-raised">
+ *     <span class="chrome-raised-shadow"></span>
+ *     <span class="chrome-raised-edge"></span>
+ *     <span class="chrome-raised-front"></span>
+ *     <... content ...>
+ *   </div>
+ *
+ * Variables you can tune per-instance:
+ *   --raised-radius     border-radius of all three layers
+ *   --raised-thrust     front-face translateY (negative = up)
+ *   --raised-shadow-y   shadow-layer translateY (positive = down)
+ *   --raised-front-bg   front face background (gradient or color)
+ *   --raised-edge-bg    edge/shadow background (gradient or color)
+ *
+ * The button and panel classes below set these; bespoke callers can
+ * override on a wrapper.
+ * ============================================================ */
+
+.chrome-raised {
+  --raised-radius: var(--chrome-button-radius);
+  --raised-thrust: -3px;
+  --raised-shadow-y: 2px;
+  --raised-front-bg: var(--chrome-slate-base);
+  --raised-edge-bg: var(--chrome-button-edge);
+
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+}
+
+.chrome-raised-shadow,
+.chrome-raised-edge,
+.chrome-raised-front {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--raised-radius);
+  pointer-events: none;
+}
+
+/*
+ * Shadow — the deepest layer. Transparent fill (the cast shadow comes
+ * from box-shadow); the span exists to drive the cast shadow without
+ * painting a visible "second layer" stripe.
+ */
+.chrome-raised-shadow {
+  background: rgba(16, 16, 16, 0.946);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.55);
+  transform: translateY(var(--raised-shadow-y));
+  transition: transform 600ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  will-change: transform;
+  z-index: 0;
+}
+
+/*
+ * Edge — the side-wall layer. The chamfer is a rolled-over curve, not
+ * a flat strip: a vertical gradient runs from a bright crest at the
+ * top (light grazing the rolled edge) down through the body color and
+ * into deep shadow at the base.
+ */
+.chrome-raised-edge {
+  background: var(--raised-edge-bg);
+  filter: brightness(0.85);
+  z-index: 1;
+}
+
+/*
+ * Front — the top face the content sits on. Lifted upward by
+ * --raised-thrust; the gap between front-bottom and edge-top reads
+ * as the visible side wall.
+ */
+.chrome-raised-front {
+  background: var(--raised-front-bg);
+  background-image:
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 2px 1px rgb(255 255 255 / 0.05);
+  transform: translateY(var(--raised-thrust));
+  transition: transform 600ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  will-change: transform;
+  z-index: 2;
+}
+
+/*
+ * Content inside a chrome-raised sits above the front face. Applied
+ * via :where() so the rule contributes ZERO specificity — that way
+ * per-instance overrides (e.g. .screen { z-index: 10 }) win cleanly
+ * without specificity-juggling chains.
+ */
+.chrome-raised > :where(*:not(.chrome-raised-shadow):not(.chrome-raised-edge):not(.chrome-raised-front)) {
+  position: relative;
+  z-index: 3;
+}
+
+/* ============================================================
+ * .panel — large raised chrome plate. The chassis.
+ *
+ * Same substrate as chrome-raised, just sized larger and with a
+ * gentler thrust ratio (a wide flat plate, not a tall button).
+ * The grain noise paints onto the front face via direct-child
+ * selector so nested raised primitives (PushButtons) keep their
+ * own gradient.
+ * ============================================================ */
+
+.panel {
+  --raised-radius: var(--chrome-panel-radius);
+  --raised-thrust: -2px;
+  --raised-shadow-y: 3px;
+  --raised-front-bg: var(--chrome-panel-bg);
+
+  display: block;
+  color: var(--chrome-button-label);
+}
+
+.panel > .chrome-raised-front {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.022 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%),
+    var(--chrome-panel-bg);
+  background-size: 240px 240px, 100% 100%, 100% 100%;
+}
+
+/* Embossed text — the engraved-label feel. */
+.chrome-emboss {
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+}
+
+/* Glowing accent text. */
+.chrome-glow {
+  color: var(--chrome-accent);
+  text-shadow: var(--chrome-text-glow);
+}
+
+/* ============================================================
+ * .chrome-select — native <select> styled to match the chrome family.
+ * ============================================================ */
+
+.chrome-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--chrome-slate-darkest);
+  background-image: linear-gradient(
+    180deg,
+    var(--chrome-slate-base) 0%,
+    var(--chrome-slate-darkest) 100%
+  );
+  color: var(--chrome-button-label);
+  border: 1px solid rgb(0 0 0 / 0.5);
+  border-radius: 6px;
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: var(--chrome-text-emboss);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 1px 2px rgb(0 0 0 / 0.6);
+  cursor: pointer;
+  /* Caret painted as a tiny SVG so it picks up the brand color. */
+  background-image:
+    linear-gradient(180deg, var(--chrome-slate-base) 0%, var(--chrome-slate-darkest) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23999' d='M0 0 L5 6 L10 0 Z'/></svg>");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 0.6rem center;
+  background-size: 100% 100%, 10px 6px;
+  transition: color 200ms ease;
+}
+
+.chrome-select:hover {
+  color: var(--chrome-button-label-hover);
+}
+
+.chrome-select:focus-visible {
+  outline: 2px solid var(--theme-lit);
+  outline-offset: 2px;
+}
+
+.chrome-select--slim {
+  padding: 0.25rem 1.6rem 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+ * .chrome-button — push button on top of .chrome-raised.
+ *
+ * Inherits the substrate; adds press/select states, label
+ * positioning, and the brightness ladder.
+ * ============================================================ */
+
+.chrome-button {
+  /* Re-declare so buttons can stand alone if needed. */
+  --raised-radius: var(--chrome-button-radius);
+  --raised-thrust: -3px;
+  --raised-shadow-y: 2px;
+  --raised-front-bg: var(--chrome-slate-base);
+  --raised-edge-bg: var(--chrome-button-edge);
+
+  /*
+   * inline-block (NOT inline-flex) so the in-flow sizer span
+   * provides only width — the explicit `height` controls the box.
+   */
+  display: inline-block;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  font: inherit;
+  color: var(--chrome-button-label);
+  text-shadow: 0 0 6px var(--theme-lit-glow);
+  transition: color 250ms ease, text-shadow 250ms ease, filter 250ms ease;
+  outline-offset: 4px;
+  height: 2.4rem;
+  vertical-align: middle;
+}
+
+/* Hidden width-sizer for the chrome button. */
+.chrome-button-sizer {
+  display: inline-grid;
+  grid-template-areas: 'a';
+  visibility: hidden;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  padding: 0 1rem;
+}
+
+.chrome-button-sizer > * {
+  grid-area: a;
+}
+
+.chrome-button[disabled] {
+  cursor: not-allowed;
+  color: var(--chrome-slate-edge);
+  text-shadow: none;
+}
+
+.chrome-button > .chrome-raised-front {
+  background: var(--chrome-slate-base);
+  background-image:
+    linear-gradient(180deg, rgb(150 150 150 / 0.1) 0%, rgb(11 11 11 / 0) 80%);
+}
+
+.chrome-button .chrome-button-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  padding: 0 1rem;
+  transform: translate(-50%, calc(-50% + var(--raised-thrust)));
+  transition: transform 600ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  will-change: transform;
+}
+
+@media (hover: hover) {
+  .chrome-button:not([disabled]):hover {
+    color: var(--chrome-button-label-hover);
+    text-shadow: 0 0 8px var(--theme-lit-edge);
+  }
+  .chrome-button[data-selected='true']:not([disabled]):hover {
+    color: var(--chrome-button-label-active-hover);
+    text-shadow: var(--chrome-text-glow);
+  }
+}
+
+.chrome-button:not([disabled]):active,
+.chrome-button[data-pressed='true'],
+.chrome-button[data-selected='true'] {
+  color: var(--chrome-button-label-active);
+  text-shadow: var(--chrome-text-glow);
+}
+
+.chrome-button:not([disabled]):active > .chrome-raised-front,
+.chrome-button[data-pressed='true'] > .chrome-raised-front,
+.chrome-button[data-selected='true'] > .chrome-raised-front {
+  transform: translateY(0);
+  transition: transform 50ms;
+}
+
+.chrome-button:not([disabled]):active > .chrome-button-label,
+.chrome-button[data-pressed='true'] > .chrome-button-label,
+.chrome-button[data-selected='true'] > .chrome-button-label {
+  transform: translate(-50%, -50%);
+  transition: transform 50ms;
+}
+
+.chrome-button:not([disabled]):active > .chrome-raised-shadow,
+.chrome-button[data-pressed='true'] > .chrome-raised-shadow,
+.chrome-button[data-selected='true'] > .chrome-raised-shadow {
+  transform: translateY(1px);
+  transition: transform 50ms;
+}
+
+/* ============================================================
+ * .chrome-lever — two-position rocker switch with 3D tilt.
+ * ============================================================ */
+
+.chrome-lever {
+  --lever-h: 44px;
+  --lever-w: 130px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--chrome-slate-darkest);
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.6);
+  perspective: 500px;
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+}
+
+.chrome-lever[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.chrome-lever-mode {
+  width: var(--lever-w);
+  height: var(--lever-h);
+  background: linear-gradient(180deg, var(--chrome-slate-base) 0%, var(--chrome-slate-darkest) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+  transition: transform 250ms ease, color 250ms ease, text-shadow 250ms ease, background 250ms ease;
+}
+
+.chrome-lever-mode:nth-child(1) {
+  border-radius: 4px 0 0 4px;
+  transform-origin: right;
+}
+
+.chrome-lever-mode:nth-child(2) {
+  border-radius: 0 4px 4px 0;
+  transform-origin: left;
+}
+
+.chrome-lever[data-position='left'] .chrome-lever-mode:nth-child(1) {
+  color: var(--chrome-accent);
+  text-shadow: var(--chrome-text-glow);
+}
+
+.chrome-lever[data-position='left'] .chrome-lever-mode:nth-child(2) {
+  transform: rotateY(-40deg);
+  background: var(--chrome-slate-darkest);
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+}
+
+.chrome-lever[data-position='right'] .chrome-lever-mode:nth-child(2) {
+  color: var(--chrome-accent);
+  text-shadow: var(--chrome-text-glow);
+}
+
+.chrome-lever[data-position='right'] .chrome-lever-mode:nth-child(1) {
+  transform: rotateY(40deg);
+  background: var(--chrome-slate-darkest);
+  color: var(--chrome-button-label);
+  text-shadow: var(--chrome-text-emboss);
+}
+
+/* ============================================================
+ * Global scrollbar — recessed-glass slot with a lit thumb.
+ *
+ * Same family as the OLED-family glass: a dark theme-tinted track
+ * that reads as a slot machined into the chassis, with a theme-hue
+ * thumb that brightens on hover.
+ *
+ * Applied globally — importing phosphor's styles.css themes every
+ * scrollable region in the consuming app without per-element opt-in.
+ *
+ * Engines:
+ *   - Chromium / Safari paint the parts via ::-webkit-scrollbar-*;
+ *     these pseudos do NOT inherit, so the universal selector is
+ *     the only way to reach every scroll container.
+ *   - Firefox uses the modern `scrollbar-color` / `scrollbar-width`
+ *     pair; those DO inherit, so a single :root declaration covers it.
+ *
+ * Tune per-region by overriding the `--chrome-scrollbar-*` tokens
+ * on the scroll container itself.
+ * ============================================================ */
+
+:root {
+  scrollbar-color: var(--chrome-scrollbar-thumb) var(--chrome-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: var(--chrome-scrollbar-size);
+  height: var(--chrome-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--chrome-scrollbar-track);
+  box-shadow: var(--chrome-scrollbar-track-shadow);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--chrome-scrollbar-thumb);
+  /* Hairline of track around the thumb so the lit pill reads as
+     embedded in the slot rather than filling its full thickness. */
+  border: 1px solid var(--chrome-scrollbar-track);
+  border-radius: 999px;
+  box-shadow: var(--chrome-scrollbar-thumb-glow);
+  transition: background 200ms ease;
+}
+
+@media (hover: hover) {
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--chrome-scrollbar-thumb-hover);
+  }
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: var(--chrome-scrollbar-thumb-hover);
+}
+
+/* Where vertical and horizontal scrollbars meet — fill the empty
+   square with the track tone so it doesn't punch a default-grey
+   notch through the chassis. */
+*::-webkit-scrollbar-corner {
+  background: var(--chrome-scrollbar-track);
+}

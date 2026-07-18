@@ -1,0 +1,75 @@
+/*
+ * .chrome-numberfield — recessed dark slot with a lit digital readout.
+ *
+ * A <input type="number"> styled to look like a small embedded
+ * display: theme-tinted dark fill, chamfered rim (same chamfer
+ * recipe as .screen-embedded), readout in the brand hue with a
+ * subtle glow. Numbers always read; the input is editable.
+ *
+ * Native browser spinner is hidden — interaction is via typing or
+ * the surrounding Slider. Keeps the visual clean and chrome-pure
+ * (no system-coloured up/down nub poking through).
+ */
+
+.chrome-numberfield {
+  --numberfield-h: 22px;
+  --numberfield-pad-x: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  height: var(--numberfield-h);
+  box-sizing: border-box;
+  border-radius: var(--chrome-bezel-radius);
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.16 0.04 var(--theme-hue)) 0%,
+      oklch(0.10 0.03 var(--theme-hue)) 100%
+    );
+  box-shadow: var(--embedded-chamfer);
+}
+
+.chrome-numberfield.is-disabled {
+  opacity: 0.55;
+}
+
+.chrome-numberfield input {
+  appearance: textfield;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 var(--numberfield-pad-x);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--chrome-accent-bright);
+  text-shadow: var(--chrome-glow-sm);
+  text-align: right;
+  cursor: text;
+}
+
+.chrome-numberfield.is-disabled input {
+  cursor: not-allowed;
+}
+
+/* Kill the native number spinner — keeps the readout clean. */
+.chrome-numberfield input::-webkit-outer-spin-button,
+.chrome-numberfield input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.chrome-numberfield input:focus-visible {
+  outline: 2px solid var(--theme-lit-edge);
+  outline-offset: 2px;
+  border-radius: var(--chrome-bezel-radius);
+}
