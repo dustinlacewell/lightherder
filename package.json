@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm -r --filter='./packages/*' --filter='./apps/*' run build",
-    "typecheck": "pnpm -r run typecheck",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm run build && pnpm -r run typecheck",
     "dev": "pnpm --filter @ldlework/phosphor-site run dev",
     "storybook": "pnpm --filter @ldlework/phosphor-docs run storybook"
   },
