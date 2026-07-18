@@ -35,3 +35,13 @@ of these is an independent project rather than "a change to the monorepo."
    driving a `<CrtSurface>` inside the `phosphor` chassis. With everything
    sharpened by going through OnlySines, the hero should be a cleaner thing to
    build out.
+
+6. **`LerpControl` styling gap** in `@ldlework/phosphor-dials`
+   (`src/index.ts`). Wired straight to dials' unstyled `defaultPanelComponents.LerpControl`
+   to satisfy the `PanelComponents` type — it renders a raw `<input>` with no
+   matching rule in `phosphor-dials/src/styles.css`. The code comment claims
+   it's "styling-independent like AttachControl," which isn't true:
+   `AttachControl` routes through phosphor's swapped `Dropdown`; `LerpControl`
+   doesn't route through anything phosphor-styled. Needs either a real
+   phosphor-styled `LerpControl` or a corrected comment if the gap is
+   intentional for now.
