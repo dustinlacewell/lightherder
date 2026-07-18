@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@ldlework/workmark':
-        specifier: '*'
-        version: 1.5.0
+        specifier: ^1.6.0
+        version: 1.6.0
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -648,8 +648,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@ldlework/workmark@1.5.0':
-    resolution: {integrity: sha512-bskMON/VhjomBRG14yVeaf1GRvCkYOkmvPic0nu6fHBjAhXOUzZq8gq1nKjJTq/LGzXchkmRUcPpj933frX4OQ==}
+  '@ldlework/workmark@1.6.0':
+    resolution: {integrity: sha512-Fq2hjRMscdYVR3aOfKgzEo2g0B2mHQQiCGX77LWh/hwKbjfusiLBVABMPnQERiMmiATPx2g5kH/FicZ7/U7g7Q==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -2716,7 +2716,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@ldlework/workmark@1.5.0':
+  '@ldlework/workmark@1.6.0':
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       ignore: 7.0.6

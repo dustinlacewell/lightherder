@@ -5,5 +5,6 @@ import { storybook } from '../traits/storybook.js'
 export default cmd({
   needs: [storybook],
   select: 'one',
+  interactive: true,
   handler: (_, { sh }) => sh('pnpm dev'),
 })
