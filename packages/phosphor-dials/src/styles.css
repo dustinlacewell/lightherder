@@ -281,14 +281,26 @@
 }
 
 /*
- * Pull the value readout up into the dial's bottom-gap whitespace. The
- * 270° arc leaves the SVG's lower quarter empty, so the readout would
- * otherwise float with a big void above it. Scoped to the phosphor-
- * dials knob so the shared primitive's default spacing is untouched
- * elsewhere.
+ * Pull the readout up into the dial's bottom-gap whitespace. The 270°
+ * arc leaves the SVG's lower quarter empty, so the first caption line
+ * under the dial would otherwise float with a big void above it. Scoped
+ * to the phosphor-dials knob so the shared primitive's default spacing
+ * is untouched elsewhere.
+ *
+ * Which line comes first depends on the layout: caption-ABOVE has only
+ * the value under the dial (the label is the top strip), so the value
+ * absorbs the gap. Caption-BELOW stacks label THEN value under the dial,
+ * so the LABEL absorbs the gap and the value sits normally under it —
+ * pulling the value up here would overlap it onto the label.
  */
 .pd-row-control .chrome-knob-value {
   margin-top: -8px;
+}
+.pd-row-below .pd-row-control .chrome-knob-label {
+  margin-top: -8px;
+}
+.pd-row-below .pd-row-control .chrome-knob-value {
+  margin-top: 0;
 }
 
 .pd-row-control .chrome-numberfield {
