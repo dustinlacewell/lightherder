@@ -220,9 +220,14 @@ export function Knob({
         // A MODIFIED right-click (ctrl/shift/alt/meta) belongs to the
         // host wrapping the knob — its own context-menu chords (MIDI
         // learn, a port toggle, …). The knob's depth-drag / picker-tap is
-        // a PLAIN right-click only, so bail here and let the event bubble
-        // to the host's onContextMenu.
-        if (e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return
+        // a PLAIN right-click only, so bail here and let the contextmenu
+        // event bubble to the host's onContextMenu. preventDefault (but
+        // NOT capture) so the browser doesn't focus the knob and paint
+        // its focus ring on what is really the host's gesture.
+        if (e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) {
+          e.preventDefault()
+          return
+        }
         // Right button — a depth drag, or a tap that opens the
         // associated control. Active when either gesture is wired.
         // (The context menu is suppressed via onContextMenu regardless.)
