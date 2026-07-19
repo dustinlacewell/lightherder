@@ -6,7 +6,9 @@
    only composes. */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { PanelComponentsProvider } from '@ldlework/dials/react';
 import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useStoreApi } from '@xyflow/react';
+import { herderPanelComponents } from '../controls/dialsBundle';
 import { bakeEntry, mediaPaths, unproject, viewContext, type NodeKind, type PatchEdge, type PatchNode } from '../../patch';
 import { copyStoredMedia, libStore } from '../../persist';
 import { clearAllScreens, dispatch, gateMode, mirror } from '../../runtime';
@@ -118,6 +120,7 @@ export function Bench() {
   }, [rf, root, path, prefix]);
 
   return (
+    <PanelComponentsProvider value={herderPanelComponents}>
     <div
       className="bench"
       /* presence: the pointer in flow space, streamed to the room. The
@@ -239,5 +242,6 @@ export function Bench() {
       {midiLogOpen && <MidiLog onClose={() => setMidiLogOpen(false)} />}
       {sessionOpen && <SessionPanel deps={sessionDeps} onClose={() => setSessionOpen(false)} />}
     </div>
+    </PanelComponentsProvider>
   );
 }

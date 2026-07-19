@@ -490,15 +490,44 @@ html, body, #root {
 }
 .arcgauge .val { font-size: 8px; color: var(--teal); }
 
-/* the knob drawer */
+/* the knob drawer — a horizontal strip of columns. Each column is a
+   dials SlotRow (or a bespoke knob for a stepped param); it grows
+   DOWNWARD as its modulation tree deepens, while siblings stay put on
+   the row. flex-start keeps every column pinned to the top so a tall
+   modulated column never drags the short ones down with it. */
 .drawer {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
-  gap: 6px 2px;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  gap: 6px 4px;
   padding: 8px 6px 10px;
   border-top: 1px solid var(--line);
   cursor: default;
 }
+
+/* a dials SlotRow column inside the strip — the phosphor bundle draws
+   the knob; herder only sets the column's width so the strip wraps like
+   the old grid did (its knobs are 44px). The nested sub-panel a source
+   attaches renders vertically beneath, indented by phosphor's own rail. */
+.dials-strip .dials-slot { width: 56px; }
+.dials-strip .dials-source { width: 100%; }
+
+/* per-slot chrome: the knob wrapped with its MIDI/port adornments. The
+   dots ride the top corners of the 44px knob face, matching where the
+   bespoke Knob drew them (MIDI top-right, port top-left). */
+.slot-chrome { position: relative; }
+.slot-dot {
+  position: absolute;
+  top: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.slot-dot.midi { right: 4px; }
+.slot-dot.midi.bound { background: var(--red); }
+.slot-dot.midi.learning { background: var(--amber); animation: midi-pulse 0.6s ease-in-out infinite alternate; }
+.slot-dot.port { left: 4px; background: var(--teal); }
 
 /* ---- knobs ----------------------------------------------------------------- */
 

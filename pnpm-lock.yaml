@@ -75,6 +75,12 @@ importers:
       '@ldlework/dials':
         specifier: workspace:*
         version: link:../../packages/dials
+      '@ldlework/phosphor':
+        specifier: workspace:*
+        version: link:../../packages/phosphor
+      '@ldlework/phosphor-dials':
+        specifier: workspace:*
+        version: link:../../packages/phosphor-dials
       '@xyflow/react':
         specifier: ^12.11.2
         version: 12.11.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

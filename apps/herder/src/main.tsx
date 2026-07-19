@@ -5,6 +5,8 @@
 
 import { createRoot } from 'react-dom/client';
 import '@xyflow/react/dist/style.css';
+import '@ldlework/phosphor/styles.css';
+import '@ldlework/phosphor-dials/styles.css';
 import './style.css';
 import { bootGL } from './gl/context';
 import { Engine } from './engine';

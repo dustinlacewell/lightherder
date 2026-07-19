@@ -2,12 +2,14 @@
    name, action buttons, drawer caret, remove), the port stack, the
    knob drawer, and the blitted face well. */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
+import { SlotRow } from '@ldlework/dials/react';
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { DRAWER, PARAMS, type NodeData, type NodeKind } from '../../patch';
-import { dispatch, releaseNode, setFace, spark, tap } from '../../runtime';
+import { dispatch, releaseNode, setFace, spark, tap, watchLive } from '../../runtime';
 import { Knob } from '../controls/Knob';
+import { SlotNodeProvider, liveOverrideFor } from '../controls/dialsBundle';
 import { KindIcon } from './icons';
 
 /* every op the shell emits addresses its node by the compiled view id
@@ -160,15 +162,67 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
         />
       ))}
       {hasDrawer && data.open && (
-        <div className="drawer nodrag">
-          {DRAWER[kind].map(k => (
+        <SlotNodeProvider node={{ id, exposed, togglePort }}>
+          <Drawer id={id} kind={kind} data={data} setParam={setParam} exposed={exposed} togglePort={togglePort} />
+        </SlotNodeProvider>
+      )}
+    </div>
+  );
+}
+
+/* the knob drawer — a horizontal strip that grows downward as any knob's
+   modulation tree deepens. A continuous param is a dials `SlotRow` (knob +
+   attach glyph + recursive sub-params, chrome for MIDI/port); a discrete
+   one (a stepped param like DELAY, where a modulation source makes no
+   sense) stays a bespoke `Knob`. Both share the strip.
+
+   A slot mutates in place with nothing observable to React, so one local
+   repaint fans every knob's re-read: SlotRow's onChange, the bespoke
+   knob's onChange, and a REMOTE op all bump it (the mirror shares the
+   doc slot by reference, so a peer's setParam lands on the same object).
+   Ops that arrive while this drawer isn't mounted just don't repaint —
+   the strip reads current values on its next open. */
+function Drawer({ id, kind, data, setParam, exposed, togglePort }: {
+  id: string; kind: NodeKind; data: NodeData; setParam: (k: string, v: number) => void;
+  exposed: string[]; togglePort: (k: string) => void;
+}) {
+  const [, repaint] = useReducer((x: number) => x + 1, 0);
+  const live = liveOverrideFor(id);
+
+  /* a wire riding an exposed param starts/stops publishing under
+     "id:key"; the SlotRow's liveOverride reads that presence at render,
+     so re-render when it flips. Coalesce to one repaint per frame — the
+     engine publishes every tick, faster than we paint. Only exposed root
+     params can be ridden, so watch exactly those. */
+  const rode = DRAWER[kind].filter(k => exposed.includes(k)).join();
+  useEffect(() => {
+    if (!rode) return;
+    let raf = 0;
+    const soon = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; repaint(); }); };
+    const offs = rode.split(',').map(k => watchLive(`${id}:${k}`, soon));
+    return () => { offs.forEach(off => off()); if (raf) cancelAnimationFrame(raf); };
+  }, [id, rode]);
+
+  return (
+    <div className="drawer dials-strip nodrag">
+      {DRAWER[kind].map(k => {
+        const def = PARAMS[kind][k];
+        const slot = data.slots[k] as Slot<number>;
+        /* a stepped param carries no modulation story — a bespoke knob,
+           no attach glyph, no chrome recursion; still port-exposable */
+        if (def.step !== undefined) {
+          return (
             <Knob
-              key={k} def={PARAMS[kind][k]} value={(data.slots[k] as Slot<number>).dial.value} onChange={v => setParam(k, v)} midiTarget={`${id}:${k}`}
+              key={k} def={def} value={slot.dial.value}
+              onChange={v => { setParam(k, v); repaint(); }} midiTarget={`${id}:${k}`}
               port={{ on: exposed.includes(k), toggle: () => togglePort(k) }}
             />
-          ))}
-        </div>
-      )}
+          );
+        }
+        return (
+          <SlotRow key={k} label={k} path={[k]} slot={slot} liveOverride={live} onChange={repaint} />
+        );
+      })}
     </div>
   );
 }
