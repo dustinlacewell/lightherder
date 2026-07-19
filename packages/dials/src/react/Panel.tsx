@@ -175,7 +175,13 @@ export function SlotRow({
 }: SlotRowProps): ReactNode {
   const c = usePanelComponents()
   const attached = slot.attached
-  const candidates = sourcesForType(slot.outType)
+  // A slot can opt out of modulation entirely (meta.modulatable: false):
+  // no attach glyph, no picker, no candidates. It still renders its
+  // editor and samples base-only, so it looks like any other slot minus
+  // the attach affordance. Suppressing candidates here also stops the
+  // Row from reserving the attach cell.
+  const modulatable = slot.dial.meta.modulatable !== false
+  const candidates = modulatable ? sourcesForType(slot.outType) : []
   const displayLabel = slot.dial.meta.label ?? label
   const rowPath = path ?? [label]
 

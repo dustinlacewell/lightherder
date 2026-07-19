@@ -206,7 +206,10 @@ export function slotFor(def: ParamDef): Slot<number> {
     label: def.label,
     min: def.min,
     max: def.max,
-    ...(def.step !== undefined ? { step: def.step } : {}),
+    /* a stepped param is discrete (delay, size, mode, res, video) —
+       a modulation source riding it makes no sense, so it renders as a
+       plain phosphor knob with no attach glyph */
+    ...(def.step !== undefined ? { step: def.step, modulatable: false } : {}),
     description: def.desc,
     hints: paramHints(def),
   });

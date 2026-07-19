@@ -59,6 +59,16 @@ export interface DialMeta<T> {
   /** Hint for the panel — e.g. 'oklch' for a color dial. */
   space?: string
   /**
+   * Whether this slot may have a source attached. `true`/`undefined`
+   * (the default) — the panel offers the attach control. `false` — the
+   * panel suppresses it entirely: no glyph, no picker, no candidates.
+   * The slot still renders its editor and still samples (base only), so
+   * a non-modulatable numeric slot looks exactly like a modulatable one
+   * minus the attach affordance. For discrete or transport-like values
+   * where modulation is nonsensical (a resolution, a frame count).
+   */
+  modulatable?: boolean
+  /**
    * Optional explainer text. When set, the panel renders a small (?)
    * affordance next to the slot label that reveals this text in a
    * popover on hover / focus. Use for non-obvious slots whose purpose,

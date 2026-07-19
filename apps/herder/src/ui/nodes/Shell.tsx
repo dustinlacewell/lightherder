@@ -8,7 +8,6 @@ import { SlotRow } from '@ldlework/dials/react';
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { DRAWER, PARAMS, type NodeData, type NodeKind } from '../../patch';
 import { dispatch, releaseNode, setFace, spark, tap, watchLive } from '../../runtime';
-import { Knob } from '../controls/Knob';
 import { SlotNodeProvider, liveOverrideFor } from '../controls/dialsBundle';
 import { KindIcon } from './icons';
 
@@ -98,7 +97,6 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
   const upd = useUpdateNodeInternals();
   const rf = useReactFlow();
   const hasDrawer = DRAWER[kind].length > 0;
-  const setParam = useSetParam(id);
 
   const exposed = DRAWER[kind].filter(k => data.ports?.includes(k));
   const labelsOn = data.labels !== false;
@@ -163,28 +161,27 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
       ))}
       {hasDrawer && data.open && (
         <SlotNodeProvider node={{ id, exposed, togglePort }}>
-          <Drawer id={id} kind={kind} data={data} setParam={setParam} exposed={exposed} togglePort={togglePort} />
+          <Drawer id={id} kind={kind} data={data} exposed={exposed} />
         </SlotNodeProvider>
       )}
     </div>
   );
 }
 
-/* the knob drawer — a horizontal strip that grows downward as any knob's
-   modulation tree deepens. A continuous param is a dials `SlotRow` (knob +
-   attach glyph + recursive sub-params, chrome for MIDI/port); a discrete
-   one (a stepped param like DELAY, where a modulation source makes no
-   sense) stays a bespoke `Knob`. Both share the strip.
+/* the knob drawer — a horizontal strip of dials `SlotRow`s that grows
+   downward as any knob's modulation tree deepens. Every param is a
+   phosphor knob; a discrete one (delay, size) carries
+   `meta.modulatable: false` so its row omits the attach glyph but is
+   otherwise identical.
 
    A slot mutates in place with nothing observable to React, so one local
-   repaint fans every knob's re-read: SlotRow's onChange, the bespoke
-   knob's onChange, and a REMOTE op all bump it (the mirror shares the
-   doc slot by reference, so a peer's setParam lands on the same object).
-   Ops that arrive while this drawer isn't mounted just don't repaint —
-   the strip reads current values on its next open. */
-function Drawer({ id, kind, data, setParam, exposed, togglePort }: {
-  id: string; kind: NodeKind; data: NodeData; setParam: (k: string, v: number) => void;
-  exposed: string[]; togglePort: (k: string) => void;
+   repaint fans every knob's re-read: each SlotRow's onChange and a REMOTE
+   op both bump it (the mirror shares the doc slot by reference, so a
+   peer's setParam lands on the same object). Ops that arrive while this
+   drawer isn't mounted just don't repaint — the strip reads current
+   values on its next open. */
+function Drawer({ id, kind, data, exposed }: {
+  id: string; kind: NodeKind; data: NodeData; exposed: string[];
 }) {
   const [, repaint] = useReducer((x: number) => x + 1, 0);
   const live = liveOverrideFor(id);
@@ -203,26 +200,18 @@ function Drawer({ id, kind, data, setParam, exposed, togglePort }: {
     return () => { offs.forEach(off => off()); if (raf) cancelAnimationFrame(raf); };
   }, [id, rode]);
 
+  /* every drawer param is a SlotRow — one phosphor knob look for all.
+     A discrete param (delay, size, …) carries `meta.modulatable: false`,
+     so its row simply omits the attach glyph; it still shows the same
+     knob, MIDI-learns, and port-toggles through the chrome. */
   return (
     <div className="drawer dials-strip nodrag">
-      {DRAWER[kind].map(k => {
-        const def = PARAMS[kind][k];
-        const slot = data.slots[k] as Slot<number>;
-        /* a stepped param carries no modulation story — a bespoke knob,
-           no attach glyph, no chrome recursion; still port-exposable */
-        if (def.step !== undefined) {
-          return (
-            <Knob
-              key={k} def={def} value={slot.dial.value}
-              onChange={v => { setParam(k, v); repaint(); }} midiTarget={`${id}:${k}`}
-              port={{ on: exposed.includes(k), toggle: () => togglePort(k) }}
-            />
-          );
-        }
-        return (
-          <SlotRow key={k} label={k} path={[k]} slot={slot} liveOverride={live} onChange={repaint} />
-        );
-      })}
+      {DRAWER[kind].map(k => (
+        <SlotRow
+          key={k} label={k} path={[k]} slot={data.slots[k] as Slot<number>}
+          liveOverride={live} onChange={repaint}
+        />
+      ))}
     </div>
   );
 }
