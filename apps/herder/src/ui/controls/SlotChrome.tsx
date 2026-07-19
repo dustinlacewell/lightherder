@@ -26,8 +26,11 @@ export function SlotChrome({ path, slot, children }: SlotChromeProps) {
   const node = useSlotNode();
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const target = node ? `${node.id}:${path.join('/')}` : null;
-  const rootKey = path.length === 1 ? path[0] : null;
-  const portOn = rootKey != null && (node?.exposed.includes(rootKey) ?? false);
+  /* port-exposable: a root (depth-1) slot on a node that OFFERS ports —
+     a dial's val is a root slot but its node carries no togglePort, so
+     the whole port affordance (gesture, dot, title line) stays off */
+  const rootKey = path.length === 1 && node?.togglePort ? path[0] : null;
+  const portOn = rootKey != null && (node?.exposed?.includes(rootKey) ?? false);
 
   /* re-render when this target's learn state flips, whoever triggered it
      (a right-click on another knob can steal the arm) */
@@ -54,7 +57,7 @@ export function SlotChrome({ path, slot, children }: SlotChromeProps) {
   const onContextMenu = (e: React.MouseEvent): void => {
     if (rootKey != null && e.shiftKey && !e.ctrlKey) {
       e.preventDefault(); e.stopPropagation();
-      node!.togglePort(rootKey); return;
+      node!.togglePort!(rootKey); return;
     }
     if (e.ctrlKey) {
       e.preventDefault(); e.stopPropagation();

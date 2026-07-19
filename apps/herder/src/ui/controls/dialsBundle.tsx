@@ -44,12 +44,15 @@ const keyOf = (path: string[]): string => path.join('/');
 
 /** the node a strip of SlotRows belongs to — the port state a root-slot
     row's chrome needs, threaded down so `SlotChrome` can render (and
-    toggle) the control-port dot without every row carrying props. */
+    toggle) the control-port dot without every row carrying props.
+    `exposed`/`togglePort` are absent on a node whose slots are not
+    port-exposable (a dial — it IS a control source, it doesn't grow
+    control inputs); the chrome then offers no port affordance. */
 export interface SlotNode {
   id: string;
   /** the drawer keys currently exposed as control ports (root only) */
-  exposed: string[];
-  togglePort: (key: string) => void;
+  exposed?: string[];
+  togglePort?: (key: string) => void;
 }
 
 const SlotNodeContext = createContext<SlotNode | null>(null);
@@ -180,5 +183,13 @@ export function liveOverrideFor(id: string): LiveOverride {
     the bench root (Bench.tsx). Static: no node identity, no ops. */
 export const herderPanelComponents = {
   ...makeDialPanelComponents({ knobSize: 44, caption: 'below' }),
+  SlotChrome,
+};
+
+/** the bundle for a slot that IS a node's face (the dial's val) — the
+    same chrome at the bespoke knob's 64px, provided locally over the
+    bench bundle where such a control renders. */
+export const dialFaceComponents = {
+  ...makeDialPanelComponents({ knobSize: 64, caption: 'below' }),
   SlotChrome,
 };

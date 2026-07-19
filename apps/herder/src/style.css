@@ -409,13 +409,16 @@ html, body, #root {
 .swbtn.lit { background: var(--line); color: var(--amber); border-color: var(--line2); }
 .swbtn.home:not(.lit) { border-style: dashed; }
 
-/* dial body — the big knob centered, its lerp gauge riding beside it */
+/* dial body — the big knob centered, its lerp gauge riding beside it.
+   The val knob is a dials SlotRow at 64px (the strip default sizes for
+   44px drawer knobs), so re-widen its slot column here. */
 .dialbody {
   position: relative;
   display: flex;
   justify-content: center;
   padding: 8px 0 10px;
 }
+.dialbody .dials-slot { width: 76px; }
 .dialbody .arcgauge {
   transform: scale(80%);
   position: absolute;

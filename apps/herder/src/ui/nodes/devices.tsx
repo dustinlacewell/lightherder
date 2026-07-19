@@ -3,12 +3,14 @@
    faces are placeholder wells the engine blits the live textures
    over. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
+import { SlotRow, PanelComponentsProvider } from '@ldlework/dials/react';
 import { useStore } from '@xyflow/react';
 import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI } from '../../patch';
 import { dispatch, holdSwitch, mirror, releaseSwitch } from '../../runtime';
-import { ArcGauge, Knob, XYPad } from '../controls/Knob';
+import { ArcGauge, XYPad } from '../controls/Knob';
+import { SlotNodeProvider, dialFaceComponents, liveOverrideFor } from '../controls/dialsBundle';
 import type { DeviceProps } from '../bench/types';
 import { CPort, Face, ResetBtn, Shell, useSetParam, VPort, type FixedPort } from './Shell';
 
@@ -158,24 +160,48 @@ function dialPolarity(id: string, sourceHandle: string): 'uni' | 'bi' {
   return uni ? 'uni' : 'bi';
 }
 
+/* The dial's val is a full dials SlotRow — the same knob, attach picker,
+   modulation tree and MIDI chrome as any drawer param — so a dial is a
+   general modulation source: attach an LFO to its val, wire c:out to any
+   number of control ports, and the modulated (and glided) output rides
+   the wire (StampBank.signalOf reads the slot's lastSample). Only the
+   node carries no togglePort: a dial doesn't grow control INPUTS. */
 export function DialNode({ id, data }: DeviceProps) {
+  const [, repaint] = useReducer((x: number) => x + 1, 0);
   const setParam = useSetParam(id);
   const setLerp = (v: number) => setParam('lerp', v);
+  const live = useMemo(() => liveOverrideFor(id), [id]);
+  const node = useMemo(() => ({ id }), [id]);
+  const val = data.slots.val as Slot<number>;
   /* view edges are only the invalidation signal — the walk reads the mirror */
   const edges = useStore(s => s.edges);
   const uni = useMemo(() => dialPolarity(id, 'c:out') === 'uni', [id, edges]);
-  /* a stored bipolar value has nowhere to live on a unipolar knob */
+  /* polarity re-range lives on the slot's META — the knob face, the MIDI
+     CC mapping and the modulation depth scaling all read min/max there,
+     so one write retunes all three (the same in-place meta channel
+     StampBank uses for lerp). Display-plus-travel only: the engine's
+     wire combine keys off the TARGET port's polarity, not this. NB: a
+     module-inner dial's meta is shared with its sibling clones
+     (cloneSlot shares meta by reference) — the re-range follows whichever
+     instance is mounted, a display blemish only. A stored bipolar value
+     has nowhere to live on a unipolar knob, so it clamps to the floor. */
   useEffect(() => {
-    if (uni && (data.slots.val as Slot<number>).dial.value < 0) setParam('val', 0);
-  }, [uni, (data.slots.val as Slot<number>).dial.value]);
+    const d = uni ? DIAL_VAL_UNI : PARAMS.dial.val;
+    if (val.dial.meta.min !== d.min) {
+      val.dial.meta.min = d.min;
+      val.dial.meta.description = d.desc;
+      repaint();
+    }
+    if (uni && val.dial.value < 0) setParam('val', 0);
+  }, [uni, val, val.dial.value]);
   return (
     <Shell id={id} data={data} kind="dial">
-      <div className="dialbody">
-        <Knob
-          def={uni ? DIAL_VAL_UNI : PARAMS.dial.val} value={(data.slots.val as Slot<number>).dial.value} onChange={v => setParam('val', v)}
-          size={64} midiTarget={`${id}:val`}
-          shift={{ def: PARAMS.dial.lerp, value: (data.slots.lerp as Slot<number>).dial.value, onChange: setLerp }}
-        />
+      <div className="dialbody dials-strip nodrag">
+        <SlotNodeProvider node={node}>
+          <PanelComponentsProvider value={dialFaceComponents}>
+            <SlotRow label="val" path={['val']} slot={val} liveOverride={live} onChange={repaint} />
+          </PanelComponentsProvider>
+        </SlotNodeProvider>
         <ArcGauge def={PARAMS.dial.lerp} value={(data.slots.lerp as Slot<number>).dial.value} onChange={setLerp} />
       </div>
       <CPort dir="out" id="c:out" top={80} desc="the control signal — wire it to a camera's rot or zoom port" />
