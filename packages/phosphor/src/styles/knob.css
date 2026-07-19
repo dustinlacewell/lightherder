@@ -1,0 +1,134 @@
+/*
+ * .chrome-knob — rotary dial in herder's design language, expressed
+ * in phosphor tokens.
+ *
+ * The dim full track is the unlit-segments layer; the fill arc from
+ * the start angle to the user-set baseline is lit brand light; while
+ * modulated, a separate accent arc spans baseline → live value,
+ * showing the current excursion from the set point. The cap is a
+ * small machined chrome part with a radial pointer line. Label + lit
+ * value readout stack under the dial. The white band inlay (the
+ * modulation envelope, baseline ± depth) draws at the track radius,
+ * under both arcs — the accent sweeps back and forth over it, so the
+ * white reads as the range and the accent as the moment.
+ */
+
+.chrome-knob {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chrome-knob:focus-visible svg {
+  outline: 1px solid var(--theme-lit-edge);
+  border-radius: 50%;
+}
+
+.chrome-knob-dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Track: the unlit ring. */
+.chrome-knob-track {
+  stroke: var(--theme-lit-dim);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  fill: none;
+  transition: stroke 0.18s ease;
+}
+
+.chrome-knob:hover .chrome-knob-track {
+  stroke: var(--theme-lit-edge);
+}
+
+/* Band inlay: a soft white arc marking the modulation envelope,
+   drawn OVER the fill so it reads on both sides of the set point,
+   and wider than the 2.5 track/fill strokes so it rims out around
+   them. The white + its glow are exposed as style hooks (like the
+   glow-scale tokens) so a single instance can be retuned without
+   restyling the class. */
+.chrome-knob-band {
+  --chrome-knob-band-color: rgb(255 255 255 / 1);
+  --chrome-knob-band-glow: rgb(255 255 255 / 0.5);
+  stroke: var(--chrome-knob-band-color);
+  stroke-width: 4.25;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 1.5px var(--chrome-knob-band-glow));
+}
+
+/* Fill arc: lit segment from the start angle to the user-set
+   baseline. Stays brand-lit even while modulated — the accent lives
+   in the offset arc, not here. */
+.chrome-knob-fill {
+  stroke: var(--theme-lit-bright);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 2px var(--theme-lit-edge));
+}
+
+/* Offset arc: baseline → live value, the modulation's current
+   excursion from the set point, in the modulation accent. Thinner
+   than the track so the white envelope stays visible around it. */
+.chrome-knob-offset {
+  stroke: var(--chrome-accent-mod);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 2px var(--chrome-accent-mod-glow));
+}
+
+/* Cap: a small machined chrome part. The sheen gradient lives in the
+   SVG defs; the rim and seated shadow live here. */
+.chrome-knob-cap {
+  stroke: var(--chrome-slate-edge);
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5));
+}
+
+/* Pointer: radial line on the cap at the value angle, lit like the
+   fill arc. */
+.chrome-knob-pointer {
+  stroke: var(--theme-lit-bright);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px var(--theme-lit-edge));
+}
+
+.chrome-knob[data-live='true'] .chrome-knob-pointer {
+  stroke: var(--chrome-accent-mod);
+  filter: drop-shadow(0 0 2px var(--chrome-accent-mod-glow));
+}
+
+/* Caption: the param name, engraved under the dial. */
+.chrome-knob-label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--theme-label-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Value readout: small lit digits under the label. */
+.chrome-knob-value {
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--chrome-accent-bright);
+  text-shadow: var(--chrome-glow-sm);
+  text-align: center;
+  pointer-events: none;
+}

@@ -10,8 +10,17 @@ export { ChipToggle } from './ChipToggle'
 export { HueStrip } from './HueStrip'
 export { CodeBlock, type CodeLang } from './CodeBlock'
 export { Slider, type SliderProps } from './Slider'
+export { Knob, type KnobProps } from './Knob'
+export { ArcGauge, type ArcGaugeProps } from './ArcGauge'
 export { NumberField, type NumberFieldProps } from './NumberField'
 export { Dropdown, type DropdownProps, type DropdownOption } from './Dropdown'
+export {
+  IconPicker,
+  HoverCard,
+  type IconPickerProps,
+  type IconPickerOption,
+  type HoverCardProps,
+} from './IconPicker'
 export { HelpTooltip, type HelpTooltipProps } from './HelpTooltip'
 export { Tabs, type TabsProps, type TabItem } from './Tabs'
 export { SidePanel, type SidePanelProps } from './SidePanel'

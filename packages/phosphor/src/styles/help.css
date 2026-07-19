@@ -98,3 +98,15 @@
 .chrome-help-popover span {
   display: block;
 }
+
+/* ----- HoverCard ----- */
+/*
+ * .chrome-hovercard — the HoverCard popup (IconPicker's hover-peek
+ * mechanism) reuses .chrome-help-popover wholesale for the plate,
+ * title, and body treatment; this class exists as a hook for
+ * card-only extensions. The host wrapper shrink-wraps its child so
+ * wrapping a grid cell or a trigger button doesn't disturb layout.
+ */
+.chrome-hovercard-host {
+  display: inline-flex;
+}

@@ -29,6 +29,15 @@
   --chrome-accent-dim: oklch(0.45 0.12 var(--theme-hue));
   --chrome-accent-glow: var(--theme-lit-glow);
 
+  /* Modulation accent — the alternate lit color for controls that
+     visualise an attached-modulation extent (e.g. the Knob's variation
+     band). Hue-offset by +140 from the theme (the same offset as
+     --screen-chip-glow-alt) rather than fixed, so it keeps contrast
+     against any theme hue. */
+  --chrome-accent-mod: oklch(0.78 0.16 calc(var(--theme-hue) + 140));
+  --chrome-accent-mod-glow: oklch(0.78 0.16 calc(var(--theme-hue) + 140) / 0.35);
+  --chrome-accent-mod-dim: oklch(0.78 0.16 calc(var(--theme-hue) + 140) / 0.22);
+
   /* Secondary segmented-display color — kept hue-locked at green so
      primary/secondary readouts can coexist visually. The brand color
      can shift; this stays the "VU meter green" complement. */

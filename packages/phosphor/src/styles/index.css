@@ -19,7 +19,10 @@
 @import './codeblock.css';
 @import './slider.css';
 @import './numberfield.css';
+@import './knob.css';
+@import './arcgauge.css';
 @import './dropdown.css';
+@import './iconpicker.css';
 @import './help.css';
 @import './tabs.css';
 @import './sidepanel.css';
