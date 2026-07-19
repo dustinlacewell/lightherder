@@ -11,8 +11,9 @@
    the debounced persist. Globals never take this path — their knobs are
    always mounted. */
 
-import { GLOBAL_PARAMS, PARAMS, type ParamDef } from '../patch';
+import { GLOBAL_PARAMS, resolveSlot } from '../patch';
 import { dispatch, mirror } from '../runtime';
+import type { Slot } from '@ldlework/dials';
 import type { Listener, Target } from './types';
 
 const targets = new Map<string, Target>();
@@ -43,7 +44,10 @@ export function targetResolves(target: string): boolean {
   const scope = target.slice(0, i), param = target.slice(i + 1);
   if (scope === 'global') return param in GLOBAL_PARAMS;
   const n = mirror.nodes.find(n => n.id === scope);
-  return !!n && param in PARAMS[n.type];
+  /* `param` is a slot PATH ("zoom" | "zoom/freq"); it resolves if the
+     path walks to a real slot in the node's live tree. A binding to a
+     sub-slot dies when its source is swapped — the walk returns null. */
+  return !!n && resolveSlot(n.data.slots, param) !== null;
 }
 
 /* ---- the model fallback ------------------------------------------------- */
@@ -63,9 +67,16 @@ export function fireModelWrite(): void {
   modelWritten?.();
 }
 
-const clampStep = (def: ParamDef, v: number): number => {
-  v = Math.min(def.max, Math.max(def.min, v));
-  return def.step ? Math.round(v / def.step) * def.step : v;
+/** min/max/step off a slot's meta — the range a CC maps into. Sub-slots
+    (source params) carry their own meta, so this works at any depth. */
+function slotRange(slot: Slot<number>): { min: number; max: number; step?: number } {
+  const m = slot.dial.meta;
+  return { min: m.min ?? 0, max: m.max ?? 1, ...(m.step !== undefined ? { step: m.step } : {}) };
+}
+
+const clampStep = (r: { min: number; max: number; step?: number }, v: number): number => {
+  v = Math.min(r.max, Math.max(r.min, v));
+  return r.step ? Math.round(v / r.step) * r.step : v;
 };
 
 /* a CC with no mounted knob rides the op dispatcher: the setParam op is
@@ -74,20 +85,26 @@ const clampStep = (def: ParamDef, v: number): number => {
    the applier reads the level from the compiled id. `silent` forces the
    in-place tree write on ANY level, viewed or not: a CC must never ride
    a React render, so a relative encoder re-reads the value it just wrote
-   and a burst never drops an increment. */
+   and a burst never drops an increment.
+
+   `param` is a slot path — a root knob or a modulated sub-param; the
+   range comes off the resolved slot's own meta, so learning a CC to a
+   source's `freq` sub-slot works the same as to a root knob. */
 function modelTarget(target: string): Target | null {
   const i = target.indexOf(':');
   if (i < 0) return null;
   const scope = target.slice(0, i), param = target.slice(i + 1);
   if (scope === 'global') return null;
   const n = mirror.nodes.find(n => n.id === scope);
-  const def = n ? PARAMS[n.type]?.[param] : undefined;
-  if (!n || !def) return null;
+  const slot = n ? (resolveSlot(n.data.slots, param) as Slot<number> | null) : null;
+  if (!n || !slot) return null;
+  const r = slotRange(slot);
   const write = (v: number): void => {
-    dispatch({ kind: 'setParam', scope: { kind: 'doc', path: [] }, node: scope, key: param, v: clampStep(def, v) }, { silent: true });
+    dispatch({ kind: 'setParam', scope: { kind: 'doc', path: [] }, node: scope, key: param, v: clampStep(r, v) }, { silent: true });
   };
+  const current = (): number => slot.lastSample ?? slot.dial.value;
   return {
-    onValue: t => write(def.min + t * (def.max - def.min)),
-    onStep: steps => write((n.data.v[param] ?? def.def) + steps * (def.step || (def.max - def.min) / 120)),
+    onValue: t => write(r.min + t * (r.max - r.min)),
+    onStep: steps => write(current() + steps * (r.step || (r.max - r.min) / 120)),
   };
 }

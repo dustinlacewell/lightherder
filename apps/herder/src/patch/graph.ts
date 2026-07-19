@@ -52,7 +52,8 @@
    owing it nothing, so a headless client can hold a patch without
    pulling in an editor. */
 
-import { defaultValues } from './params';
+import type { Dials } from '@ldlework/dials';
+import { slotsFor } from './params';
 import type { InstVals } from './library';
 
 export type NodeKind = 'media' | 'draw' | 'camera' | 'monitor' | 'mixer' | 'switch' | 'dial' | 'xypad' | 'in' | 'out' | 'module';
@@ -62,7 +63,12 @@ export interface SubPatch { nodes: PatchNode[]; edges: PatchEdge[] }
 
 export interface NodeData extends Record<string, unknown> {
   name: string;
-  v: Record<string, number>;
+  /** the live dials slot tree — one Slot per param, each modulatable
+      (base + depth·signal) to arbitrary depth. Aliased by reference into
+      the compiled mirror exactly as `v` was, so an op's in-place slot
+      mutation reaches the engine same-tick with no recompile. Converts
+      to/from `DialsSnap` only at the JSON edges. */
+  slots: Dials;
   sel: number;          // switch: latched (home) input, 0-based
   momentary: boolean;   // switch flavor: spring-return
   open: boolean;        // knob drawer visible
@@ -95,11 +101,14 @@ export interface PatchEdge {
   targetHandle: string;
 }
 
-/** the whole bench: one graph tree plus the transport globals */
+/** the whole bench: one graph tree plus the transport globals.
+    `globals` is a slot tree like every node's — video/res carry no
+    modulation (decision), but the read model is uniform: the engine
+    pulls a global's value off its slot, never a raw number map. */
 export interface Patch {
   nodes: PatchNode[];
   edges: PatchEdge[];
-  globals: Record<string, number>;
+  globals: Dials;
 }
 
 /* ---- ports ------------------------------------------------------------ */
@@ -170,7 +179,7 @@ export function makeNode(kind: NodeKind, x: number, y: number, existing: PatchNo
     position: { x, y },
     data: {
       name: `${label} ${count + 1}`,
-      v: defaultValues(kind),
+      slots: slotsFor(kind),
       sel: 0,
       momentary,
       open: false,

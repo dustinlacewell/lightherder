@@ -8,6 +8,7 @@
    though S1 only speaks `ctl` — but only the control messages are
    exchanged until the op stream and join snapshot land (S3/S4). */
 
+import type { DialsSnap } from '@ldlework/dials';
 import type { NodeKind, Op } from '../patch';
 
 /** the protocol version, stamped in `hello` so a future dialect can be
@@ -60,7 +61,7 @@ export interface ReqMsg { cs: number; op: Op; b?: string[] }
 export interface SnapMsg {
   seq: number;
   patch: unknown;                 // graphToJSON of the root
-  globals: Record<string, number>;
+  globals: DialsSnap;             // treeToSnap of the globals tree
   entries: { id: string; name: string; patch: unknown }[];
   pin: string | null;
   frozen: boolean;

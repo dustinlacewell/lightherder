@@ -4,9 +4,13 @@
 
 export {
   polarityOf, defaultValues, defaultGlobals,
+  slotFor, slotsFor, globalSlots, paramHints,
   PARAMS, DRAWER, GLOBAL_PARAMS, DIAL_VAL_UNI, XYPAD_X_UNI, XYPAD_Y_UNI, MIXER_MODES, RES_STEPS, RES_LABELS,
-  type ParamDef,
+  type ParamDef, type ParamHints,
 } from './params';
+export {
+  resolveSlot, slotToSnap, slotFromSnap, applySnapOverlay, treeToSnap, cloneTree, applySlotOp,
+} from './slots';
 export {
   handleKind, validConnection, moduleInterface, mediaPaths, makeNode, makeEdge,
   SWITCH_INS,
@@ -20,6 +24,9 @@ export {
 export { compile } from './compile';
 export { levelAt, viewContext, projectLevel, unproject, carryOrphanEdges, libCrumbId, libHead, type Crumb, type ViewCtx, type Overlay } from './drill';
 export { resolveCompiled, type Resolved } from './resolve';
-export { applyOp, type Op, type OpScope, type OpEffect, type PropKey } from './ops';
+export {
+  applyOp, isValueOp, isSlotValueOp, VALUE_OPS,
+  type Op, type OpScope, type OpEffect, type PropKey, type SlotValueOp,
+} from './ops';
 export { graphToJSON, graphFromJSON, patchToJSON, patchFromJSON } from './json';
 export { CAMCORDER, piecePatch, duoPatch } from './presets';

@@ -19,9 +19,10 @@
    the rings (the host pressed New). */
 
 import {
-  applyOp, compile, instancePrefixes, sweepEntryVals,
+  applyOp, applySlotOp, compile, instancePrefixes, isSlotValueOp, isValueOp, sweepEntryVals,
   type NodeData, type Op, type OpScope, type SubPatch,
 } from '../patch';
+import { setDial, type Slot } from '@ldlework/dials';
 import { dropEntryMedia, libStore } from '../persist';
 import { engineRef, mirror, registerApplier, releaseNode, type DispatchOpts } from '../runtime';
 
@@ -70,7 +71,7 @@ export function installViewerApplier(): void {
    application always lands. */
 function applyViewer(op: Op, _opts: DispatchOpts): Op {
   if (op.kind === 'setGlobal') {
-    mirror.globals[op.k] = op.v;
+    setDial(mirror.globals[op.k] as Slot<number>, op.v);
     if (op.k === 'res') engineRef.current?.setResolution(op.v);
     return op;
   }
@@ -80,7 +81,7 @@ function applyViewer(op: Op, _opts: DispatchOpts): Op {
        legitimately drop — that is the semantics. */
     if (op.globals) {
       mirror.globals = op.globals;
-      engineRef.current?.setResolution(op.globals.res);
+      engineRef.current?.setResolution((op.globals.res as Slot<number>).dial.value);
     }
     viewerRebuild(op.patch);
     return op;
@@ -130,7 +131,7 @@ function applyCanonical(op: Exclude<Op, { kind: 'setGlobal' | 'replaceGraph' | '
   const effect = applyOp(root, mirror.globals, libStore.doc, op);
   writeParamRemote(op, scope);
 
-  if (op.kind === 'setParam' || op.kind === 'setSel') return;   // values never recompile
+  if (isValueOp(op)) return;   // values never recompile
   if (op.kind === 'markMedia') {
     /* an override marker changed the compiled mediaKey — recompile so the
        node re-stamps its key and the engine reads the newly-stored blob. */
@@ -163,13 +164,13 @@ function applyCanonical(op: Exclude<Op, { kind: 'setGlobal' | 'replaceGraph' | '
    engine. Values without rel already rode applyOp's aliased in-place write
    into the shared node data. */
 function writeParamRemote(op: Op, scope: OpScope): void {
-  if ((op.kind !== 'setParam' && op.kind !== 'setSel') || op.rel === undefined) return;
+  if (!(isSlotValueOp(op) || op.kind === 'setSel') || op.rel === undefined) return;
   const prefix = scope.kind === 'doc' ? prefixOf(scope.path) : '';
   const compiledId = prefix + op.node + '/' + op.rel;
   const m = mirror.nodes.find(n => n.id === compiledId);
   if (!m) return;
-  if (op.kind === 'setParam') (m.data as NodeData).v[op.key] = op.v;
-  else (m.data as NodeData).sel = op.i;
+  if (op.kind === 'setSel') (m.data as NodeData).sel = op.i;
+  else if (isSlotValueOp(op)) applySlotOp((m.data as NodeData).slots, op);
 }
 
 const prefixOf = (path: string[]): string => (path.length ? path.join('/') + '/' : '');

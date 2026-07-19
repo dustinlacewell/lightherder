@@ -23,7 +23,8 @@
        read loadStoredMedia exactly once, at construction. Store after the
        rebuild and the picture would be a frame late or missing entirely. */
 
-import { graphFromJSON, graphToJSON, type SubPatch } from '../patch';
+import { applySnapOverlay, cloneTree, globalSlots, graphFromJSON, graphToJSON, treeToSnap, type SubPatch } from '../patch';
+import type { Slot } from '@ldlework/dials';
 import {
   dropStoredMediaUnder, hasStash, loadPatch, loadStoredMedia,
   reloadLibrary, restoreDocs, restoreMedia, storeMedia,
@@ -54,7 +55,7 @@ export async function sendSnapshot(l: Live, target: string): Promise<void> {
   const snap: SnapMsg = {
     seq: l.seq,
     patch: graphToJSON(l.deps.root()),
-    globals: { ...mirror.globals },
+    globals: treeToSnap(mirror.globals),
     entries: entriesJSON(),
     pin: stage.preview.nodeId,
     frozen: transport.frozen,
@@ -138,8 +139,10 @@ export async function applyJoin(l: Live, snap: SnapMsg, blobs: Map<string, HeldB
   /* 6 · adopt the host's globals, resolution, freeze and pin, then rebuild
         the graph — the swap. globals/res BEFORE the rebuild so the first
         compile paces itself by the host's standard. */
-  mirror.globals = { ...snap.globals };
-  engineRef.current?.setResolution(snap.globals.res);
+  const globals = globalSlots();
+  applySnapOverlay(globals, snap.globals);
+  mirror.globals = globals;
+  engineRef.current?.setResolution(snap.globals.res.value as number);
   transport.frozen = snap.frozen;
   sessionStore.set({ remotePin: snap.pin });
   const root = graphFromJSON(snap.patch) ?? { nodes: [], edges: [] };
@@ -211,9 +214,9 @@ export async function restorePeerBench(l: Live, swapped: boolean): Promise<void>
 
   /* rebuild the graph from the restored patch — the constructors read the
      peer's pictures, which are now safely back on disk. */
-  const patch = loadPatch() ?? { nodes: [], edges: [], globals: { ...mirror.globals } };
+  const patch = loadPatch() ?? { nodes: [], edges: [], globals: cloneTree(mirror.globals) };
   mirror.globals = patch.globals;
-  engineRef.current?.setResolution(patch.globals.res);
+  engineRef.current?.setResolution((patch.globals.res as Slot<number>).dial.value);
   l.deps.rebuild({ nodes: patch.nodes, edges: patch.edges });
 
   dropStash();

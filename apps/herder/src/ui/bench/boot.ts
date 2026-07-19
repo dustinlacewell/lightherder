@@ -4,7 +4,7 @@
    bindings load against the COMPILED graph so bindings inside modules
    survive. */
 
-import { compile, piecePatch, projectLevel, type SubPatch } from '../../patch';
+import { cloneTree, compile, piecePatch, projectLevel, type SubPatch } from '../../patch';
 import {
   backupPremigration, dropStash, hasStash, libStore, loadPatch, migrateEmbedded,
   reloadLibrary, restoreDocs, restoreMedia, saveLibraryNow, savePatch,
@@ -51,7 +51,7 @@ export const bootRestore: Promise<void> = restore;
    a one-time safety net so the original always survives the conversion */
 backupPremigration();
 
-const boot = loadPatch() ?? { ...piecePatch(), globals: { ...mirror.globals } };
+const boot = loadPatch() ?? { ...piecePatch(), globals: cloneTree(mirror.globals) };
 mirror.globals = boot.globals;
 
 export const bootRoot: SubPatch = { nodes: boot.nodes, edges: boot.edges };

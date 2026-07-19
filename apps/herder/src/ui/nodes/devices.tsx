@@ -4,6 +4,7 @@
    over. */
 
 import { useEffect, useMemo, useState } from 'react';
+import type { Slot } from '@ldlework/dials';
 import { useStore } from '@xyflow/react';
 import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI } from '../../patch';
 import { dispatch, holdSwitch, mirror, releaseSwitch } from '../../runtime';
@@ -63,7 +64,7 @@ export function MonitorNode({ id, data }: DeviceProps) {
 
 export function MixerNode({ id, data }: DeviceProps) {
   const setParam = useSetParam(id);
-  const mode = Math.round(data.v.mode);
+  const mode = Math.round((data.slots.mode as Slot<number>).dial.value);
   return (
     <Shell
       id={id} data={data} kind="mixer" fixed={MIX_FIXED}
@@ -165,17 +166,17 @@ export function DialNode({ id, data }: DeviceProps) {
   const uni = useMemo(() => dialPolarity(id, 'c:out') === 'uni', [id, edges]);
   /* a stored bipolar value has nowhere to live on a unipolar knob */
   useEffect(() => {
-    if (uni && data.v.val < 0) setParam('val', 0);
-  }, [uni, data.v.val]);
+    if (uni && (data.slots.val as Slot<number>).dial.value < 0) setParam('val', 0);
+  }, [uni, (data.slots.val as Slot<number>).dial.value]);
   return (
     <Shell id={id} data={data} kind="dial">
       <div className="dialbody">
         <Knob
-          def={uni ? DIAL_VAL_UNI : PARAMS.dial.val} value={data.v.val} onChange={v => setParam('val', v)}
+          def={uni ? DIAL_VAL_UNI : PARAMS.dial.val} value={(data.slots.val as Slot<number>).dial.value} onChange={v => setParam('val', v)}
           size={64} midiTarget={`${id}:val`}
-          shift={{ def: PARAMS.dial.lerp, value: data.v.lerp, onChange: setLerp }}
+          shift={{ def: PARAMS.dial.lerp, value: (data.slots.lerp as Slot<number>).dial.value, onChange: setLerp }}
         />
-        <ArcGauge def={PARAMS.dial.lerp} value={data.v.lerp} onChange={setLerp} />
+        <ArcGauge def={PARAMS.dial.lerp} value={(data.slots.lerp as Slot<number>).dial.value} onChange={setLerp} />
       </div>
       <CPort dir="out" id="c:out" top={80} desc="the control signal — wire it to a camera's rot or zoom port" />
     </Shell>
@@ -189,19 +190,19 @@ export function XyPadNode({ id, data }: DeviceProps) {
   const uniX = useMemo(() => dialPolarity(id, 'c:x') === 'uni', [id, edges]);
   const uniY = useMemo(() => dialPolarity(id, 'c:y') === 'uni', [id, edges]);
   useEffect(() => {
-    if (uniX && data.v.x < 0) setParam('x', 0);
-  }, [uniX, data.v.x]);
+    if (uniX && (data.slots.x as Slot<number>).dial.value < 0) setParam('x', 0);
+  }, [uniX, (data.slots.x as Slot<number>).dial.value]);
   useEffect(() => {
-    if (uniY && data.v.y < 0) setParam('y', 0);
-  }, [uniY, data.v.y]);
+    if (uniY && (data.slots.y as Slot<number>).dial.value < 0) setParam('y', 0);
+  }, [uniY, (data.slots.y as Slot<number>).dial.value]);
   return (
     <Shell id={id} data={data} kind="xypad">
       <div className="xypadbody">
         <XYPad
-          defX={uniX ? XYPAD_X_UNI : PARAMS.xypad.x} x={data.v.x} onX={v => setParam('x', v)} midiX={`${id}:x`}
-          defY={uniY ? XYPAD_Y_UNI : PARAMS.xypad.y} y={data.v.y} onY={v => setParam('y', v)} midiY={`${id}:y`}
+          defX={uniX ? XYPAD_X_UNI : PARAMS.xypad.x} x={(data.slots.x as Slot<number>).dial.value} onX={v => setParam('x', v)} midiX={`${id}:x`}
+          defY={uniY ? XYPAD_Y_UNI : PARAMS.xypad.y} y={(data.slots.y as Slot<number>).dial.value} onY={v => setParam('y', v)} midiY={`${id}:y`}
         />
-        <ArcGauge def={PARAMS.xypad.lerp} value={data.v.lerp} onChange={setLerp} />
+        <ArcGauge def={PARAMS.xypad.lerp} value={(data.slots.lerp as Slot<number>).dial.value} onChange={setLerp} />
       </div>
       <CPort dir="out" id="c:x" top={80} desc="the X control signal — wire it to a camera's port" />
       <CPort dir="out" id="c:y" top={100} desc="the Y control signal — wire it to a camera's port" />

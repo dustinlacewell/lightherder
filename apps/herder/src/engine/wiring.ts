@@ -6,7 +6,7 @@
 
 import { handleKind, type PatchEdge, type PatchNode } from '../patch';
 import { heldInput } from '../runtime';
-import type { DialBank } from './dials';
+import type { StampBank } from './stamps';
 
 const MAX_RIDE = 16;
 
@@ -60,7 +60,7 @@ export class Wiring {
      fan in themselves), and give the port to the dial whose knob moved
      most recently — ties go to the newest wire. Rest (0) if nothing
      lands. */
-  ctlIn(target: string, handle: string, dials: DialBank): number {
+  ctlIn(target: string, handle: string, dials: StampBank): number {
     let bestVal = 0, bestStamp = -1, bestOrder = -1;
     const visited = new Set<string>();
     const stack: { key: string; depth: number }[] = [{ key: `${target}|${handle}`, depth: 0 }];

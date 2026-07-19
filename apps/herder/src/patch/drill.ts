@@ -14,6 +14,7 @@
    (so the projection can render the same merged view compile does). */
 
 import { moduleInterface, type PatchEdge, type PatchNode, type SubPatch } from './graph';
+import { applySnapOverlay, cloneTree } from './slots';
 import type { EntryResolver, InstVals } from './library';
 
 export interface Crumb { id: string; name: string; entry?: { id: string; name: string } }
@@ -176,11 +177,15 @@ export function projectLevel(level: SubPatch, prefix: string, overlays?: Overlay
    never alias the entry's shared prototype. */
 function mergeInto(n: PatchNode, prefix: string, overlays: Overlay[]): PatchNode {
   const compiledId = prefix + n.id;
-  const data = { ...n.data, v: { ...n.data.v } };
+  /* fresh slot tree (cloned sources) + each overlay's snap hydrated
+     innermost-first, outermost winning — the same merge compile makes,
+     so the drilled view and the engine agree on every knob. The clone
+     is what keeps the projected node from aliasing the entry prototype. */
+  const data = { ...n.data, slots: cloneTree(n.data.slots) };
   for (let i = overlays.length - 1; i >= 0; i--) {
     const iv = overlays[i].vals[compiledId.slice(overlays[i].base.length)];
     if (iv) {
-      Object.assign(data.v, iv.v);
+      applySnapOverlay(data.slots, iv.slots);
       if (iv.sel !== undefined) data.sel = iv.sel;
     }
   }

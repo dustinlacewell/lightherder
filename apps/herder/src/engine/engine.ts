@@ -21,14 +21,15 @@
    dial glides (dials.ts), effective params (params.ts), the GL device
    passes (renderer.ts), and the overlay painting (blitter.ts). */
 
+import { read, sampleSlot, type Ctx, type Slot } from '@ldlework/dials';
 import type { GLC } from '../gl/context';
 import { Ring } from '../gl/ring';
 import { RES_STEPS, type PatchNode } from '../patch';
 import { dropStoredMediaUnder } from '../persist';
 import { flushLive, mirror, sampleSpark, transport } from '../runtime';
 import { Blitter } from './blitter';
-import { DialBank } from './dials';
-import { clampInt, paramValue } from './params';
+import { StampBank } from './stamps';
+import { clampInt, paramValue, slotValue } from './params';
 import { DeviceRenderer, type CameraParams, type ScreenParams } from './renderer';
 import { DrawSource } from './sources/draw';
 import { MediaSource } from './sources/media';
@@ -38,6 +39,20 @@ const RING_DEPTH = 6;
 
 const isProc = (n: PatchNode) => n.type === 'camera' || n.type === 'monitor' || n.type === 'mixer';
 
+/** a transport global's current value, off its (unmodulated) slot */
+function globalNum(key: string): number {
+  const s = mirror.globals[key] as Slot<number> | undefined;
+  return s ? (s.lastSample ?? s.dial.value) : 0;
+}
+
+/** sample every slot in a node's tree — advances its sources once and
+    writes each `lastSample`. The engine's per-tick pass calls this per
+    node so the resolved values are ready for every reader downstream. */
+function sampleTree(n: PatchNode, ctx: Ctx): void {
+  const slots = n.data.slots;
+  for (const k in slots) sampleSlot(slots[k] as Slot<unknown>, ctx);
+}
+
 export class Engine {
   private rings = new Map<string, Ring>();
   private media = new Map<string, MediaSource>();
@@ -45,7 +60,7 @@ export class Engine {
 
   private renderer: DeviceRenderer;
   private blitter: Blitter;
-  private dials = new DialBank();
+  private dials = new StampBank();
   /* rebuilt each tick from the mirror */
   private wiring = new Wiring([], []);
   /* who has already rendered this tick — a delay-0 device reads its
@@ -140,7 +155,7 @@ export class Engine {
       if (now >= this.nextTick) {
         /* steady cadence while keeping up; re-anchor after a stall
            (hidden tab) instead of bursting missed ticks */
-        const frameMs = 1000 / mirror.globals.video;
+        const frameMs = 1000 / globalNum('video');
         this.nextTick = this.nextTick + frameMs > now ? this.nextTick + frameMs : now + frameMs;
         this.tick();
       }
@@ -157,9 +172,22 @@ export class Engine {
 
   private tick(): void {
     this.ticks++;
-    this.simTime += 1 / mirror.globals.video;
+    const dt = 1 / globalNum('video');
+    this.simTime += dt;
+
+    /* THE sampling pass: the engine is the sole sampler. One sampleSlot
+       walk per node's slot tree per tick advances every stateful source
+       exactly once, applies each slot's meta.lerp glide in sim-time, and
+       writes every `lastSample` — the resolved (glided + modulated) value
+       every downstream reader (paramValue, StampBank, stepMixer, the UI's
+       lastSample poll) consumes. Globals sampled too (they carry no
+       modulation, but the read model is uniform). */
+    const ctx: Ctx = { dt, t: this.simTime };
+    read(mirror.globals, ctx);
+    for (const n of mirror.nodes) sampleTree(n, ctx);
+
     this.wiring = new Wiring(mirror.nodes, mirror.edges);
-    this.dials.step(mirror.nodes, 1 / mirror.globals.video, this.ticks);
+    this.dials.step(mirror.nodes, this.ticks);
 
     /* everyone renders, THEN everyone advances. Devices at delay ≥ 1
        read last tick's commits, so their order can't matter; a delay-0
@@ -282,7 +310,7 @@ export class Engine {
       this.videoIn(n.id, 'v:a', delay),
       this.videoIn(n.id, 'v:b', delay),
       ring.at(0),
-      n.data.v.mode,
+      slotValue(n, 'mode'),
       this.pv(n, 'keylvl'),
       this.screenParams(n),
     );

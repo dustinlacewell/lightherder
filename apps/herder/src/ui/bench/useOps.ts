@@ -29,9 +29,10 @@
 import { useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import {
-  applyOp, instancePrefixes, libCrumbId, makeEdge, resolveCompiled, sweepEntryVals,
+  applyOp, applySlotOp, instancePrefixes, isSlotValueOp, isValueOp, libCrumbId, makeEdge, resolveCompiled, sweepEntryVals,
   type NodeData, type Op, type OpScope, type PatchEdge, type SubPatch,
 } from '../../patch';
+import { setDial, type Slot } from '@ldlework/dials';
 import { dropEntryMedia, libStore } from '../../persist';
 import { engineRef, expectEcho, mirror, releaseNode, type DispatchOpts } from '../../runtime';
 import * as midi from '../../midi';
@@ -61,7 +62,7 @@ export interface OpsDeps {
    an in-place one leaves the memoized flat compile stale until the doc
    version bumps, so it counts as structural here even though its scope is
    the doc (its vals write lands on the owning instance, like a value). */
-const isStructural = (op: Op): boolean => op.kind !== 'setParam' && op.kind !== 'setSel';
+const isStructural = (op: Op): boolean => !isValueOp(op);
 
 /** build the applier the dispatcher installs. It resolves a
     compiled-id op to its scoped, level-local canonical form, applies it
@@ -87,7 +88,7 @@ export function useOps(deps: OpsDeps): (op: Op, opts: DispatchOpts) => Op {
        too — the same net effect locally, correct remotely. */
     if (op.kind === 'setGlobal') {
       if (opts.recordOnly) return op;
-      mirror.globals[op.k] = op.v;
+      setDial(mirror.globals[op.k] as Slot<number>, op.v);
       if (op.k === 'res') engineRef.current?.setResolution(op.v);
       return op;
     }
@@ -100,7 +101,7 @@ export function useOps(deps: OpsDeps): (op: Op, opts: DispatchOpts) => Op {
          unchanged. */
       if (op.globals) {
         mirror.globals = op.globals;
-        engineRef.current?.setResolution(op.globals.res);
+        engineRef.current?.setResolution((op.globals.res as Slot<number>).dial.value);
       }
       rebuild(op.patch);
       return op;
@@ -253,7 +254,7 @@ function applyCanonical(
          the value lives in the instance's vals, not a node field the view
          holds, so writeParam patches the mirror (+ RF node when mounted).
      markMedia has no RF node either — always in place. */
-  const isValue = op.kind === 'setParam' || op.kind === 'setSel';
+  const isValue = isValueOp(op);
   /* an entry-scoped rel-less value is a shared-DEFAULT write. It lands
      through React Flow only when this tab stands inside that very entry
      from the shelf (the RF nodes ARE the defaults). Drilled through an
@@ -262,7 +263,8 @@ function applyCanonical(
      write-back — so it must land in place. */
   const vp = viewPath();
   const libViewed = scope.kind === 'entry' && vp.length === 1 && vp[0] === libCrumbId(scope.id);
-  const inPlace = !viewed || op.kind === 'markMedia' || (isValue && op.rel !== undefined)
+  const inPlace = !viewed || op.kind === 'markMedia'
+    || ((isSlotValueOp(op) || op.kind === 'setSel') && op.rel !== undefined)
     || (isValue && scope.kind === 'entry' && !libViewed);
 
   if (!inPlace) {
@@ -381,7 +383,7 @@ function compileIds(
   prefix: string,
 ): Exclude<Op, { kind: 'setGlobal' | 'replaceGraph' | 'entryCreate' | 'entryRename' | 'entryDelete' }> {
   switch (op.kind) {
-    case 'setParam': case 'setSel':
+    case 'setParam': case 'setSel': case 'slotAttach': case 'slotDepth': case 'slotMode':
       /* a viewed value with rel addresses the node inside the instance —
          the compiled id is prefix + node + '/' + rel */
       return { ...op, node: op.rel !== undefined ? prefix + op.node + '/' + op.rel : prefix + op.node };
@@ -413,15 +415,15 @@ function writeParamRemote(
   scope: OpScope,
   viewPrefix: string,
 ): void {
-  if ((op.kind !== 'setParam' && op.kind !== 'setSel') || op.rel === undefined) return;
+  if (!(isSlotValueOp(op) || op.kind === 'setSel') || op.rel === undefined) return;
   /* an entry value's mirror id uses the drill prefix; a doc value's uses
      its scope path. When unviewed the RF node is simply absent — the
      mirror write alone carries the engine. */
   const prefix = scope.kind === 'doc' ? prefixOf(scope.path) : viewPrefix;
   const compiledId = prefix + op.node + '/' + op.rel;
   const put = (d: NodeData): void => {
-    if (op.kind === 'setParam') d.v[op.key] = op.v;
-    else if (op.kind === 'setSel') d.sel = op.i;
+    if (op.kind === 'setSel') d.sel = op.i;
+    else if (isSlotValueOp(op)) applySlotOp(d.slots, op);
   };
   const m = mirror.nodes.find(n => n.id === compiledId);
   if (m) put(m.data);
@@ -448,12 +450,12 @@ function writeParam(
      fresh (solo compile merges under a ref like any instance), so no
      aliasing reaches the mirror — this write is what the engine feels
      same-tick, and the RF write keeps a mounted lib view honest */
-  if ((canon.kind !== 'setParam' && canon.kind !== 'setSel')
+  if (!(isSlotValueOp(canon) || canon.kind === 'setSel')
     || (canon.rel === undefined && canon.scope.kind !== 'entry')) return;
-  const compiledId = op.kind === 'setParam' || op.kind === 'setSel' ? op.node : '';
+  const compiledId = isSlotValueOp(op) || op.kind === 'setSel' ? op.node : '';
   const put = (d: NodeData): void => {
-    if (canon.kind === 'setParam') d.v[canon.key] = canon.v;
-    else d.sel = canon.i;
+    if (canon.kind === 'setSel') d.sel = canon.i;
+    else if (isSlotValueOp(canon)) applySlotOp(d.slots, canon);
   };
   const m = mirror.nodes.find(n => n.id === compiledId);
   if (m) put(m.data);
@@ -574,8 +576,8 @@ function applyViewed(
   op: Exclude<Op, { kind: 'setGlobal' | 'replaceGraph' | 'entryCreate' | 'entryRename' | 'entryDelete' }>,
 ): void {
   switch (op.kind) {
-    case 'setParam':
-      rf.updateNodeData(op.node, n => ({ v: { ...(n.data as NodeData).v, [op.key]: op.v } }));
+    case 'setParam': case 'slotAttach': case 'slotDepth': case 'slotMode':
+      rf.updateNodeData(op.node, n => { applySlotOp((n.data as NodeData).slots, op); return {}; });
       return;
     case 'setSel':
       rf.updateNodeData(op.node, { sel: op.i });

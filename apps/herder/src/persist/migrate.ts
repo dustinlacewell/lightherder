@@ -28,7 +28,7 @@
    the entry's structure already speaks refs, and the nested instance's
    values lift up into the parent instance keyed one level deeper. */
 
-import { mediaPaths, type LibraryDoc, type SubPatch } from '../patch';
+import { mediaPaths, treeToSnap, type LibraryDoc, type SubPatch } from '../patch';
 import type { InstVals } from '../patch';
 import { copyStoredMedia } from './mediaStore';
 
@@ -102,7 +102,7 @@ export function migrateEmbedded(root: SubPatch, doc: LibraryDoc): boolean {
          compile stamps that same key, and seed the entry's default blob so
          a future drop of the entry shows the picture. */
       for (const rel of mediaPaths(embedded)) {
-        (vals[rel] ??= { v: {} }).media = true;
+        (vals[rel] ??= { slots: {} }).media = true;
         void copyStoredMedia(mediaPrefix + n.id + '/' + rel, id + '/' + rel);
       }
       delete n.data.patch;
@@ -132,13 +132,13 @@ function collectVals(level: SubPatch, rel: string, out: Record<string, InstVals>
       if (n.data.vals)
         for (const [k, iv] of Object.entries(n.data.vals)) out[rel + n.id + '/' + k] = cloneVals(iv);
     } else {
-      out[rel + n.id] = { v: { ...n.data.v }, sel: n.data.sel };
+      out[rel + n.id] = { slots: treeToSnap(n.data.slots), sel: n.data.sel };
     }
   }
 }
 
 function cloneVals(iv: InstVals): InstVals {
-  const out: InstVals = { v: { ...iv.v } };
+  const out: InstVals = { slots: structuredClone(iv.slots) };
   if (iv.sel !== undefined) out.sel = iv.sel;
   if (iv.media) out.media = true;
   return out;
@@ -160,7 +160,7 @@ function migrateEntry(level: SubPatch, entryKey: string, doc: LibraryDoc, mark: 
     const vals = (n.data.vals ??= {});
     collectVals(embedded, '', vals);
     for (const rel of mediaPaths(embedded)) {
-      (vals[rel] ??= { v: {} }).media = true;
+      (vals[rel] ??= { slots: {} }).media = true;
       void copyStoredMedia(entryKey + '/' + n.id + '/' + rel, id + '/' + rel);
     }
     delete n.data.patch;

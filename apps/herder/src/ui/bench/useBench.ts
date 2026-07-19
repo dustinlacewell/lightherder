@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useEdgesState, useNodesState, type Connection, type EdgeChange, type IsValidConnection, type NodeChange } from '@xyflow/react';
 import {
   carryOrphanEdges, compile, instancePrefixes, levelAt, libCrumbId, libHead, makeEdge, projectLevel,
-  sweepEntryVals, unproject, validConnection, viewContext, type Crumb, type InstVals, type SubPatch, type ViewCtx,
+  slotsFor, sweepEntryVals, treeToSnap, unproject, validConnection, viewContext, type Crumb, type InstVals, type SubPatch, type ViewCtx,
 } from '../../patch';
 import { libStore } from '../../persist';
 import { consumeEcho, dispatch, mirror, record, registerApplier, releaseNode } from '../../runtime';
@@ -151,7 +151,7 @@ export function useBench(): Bench {
       const soloRoot: SubPatch = {
         nodes: [{
           id: path[0].id, type: 'module', position: { x: 0, y: 0 },
-          data: { name: '', v: {}, sel: 0, momentary: false, open: false, ref: eid, vals: {} },
+          data: { name: '', slots: slotsFor('module'), sel: 0, momentary: false, open: false, ref: eid, vals: {} },
         }],
         edges: [],
       };
@@ -459,7 +459,7 @@ function writeEntry(root: SubPatch, ctx: ViewCtx, local: SubPatch): void {
   entry.nodes = local.nodes.map(n => {
     const was = prev.get(n.id);
     return was
-      ? { ...n, data: { ...n.data, v: was.data.v, sel: was.data.sel, vals: was.data.vals } }
+      ? { ...n, data: { ...n.data, slots: was.data.slots, sel: was.data.sel, vals: was.data.vals } }
       : n;
   });
   entry.edges = local.edges;
@@ -477,7 +477,7 @@ function writeEntry(root: SubPatch, ctx: ViewCtx, local: SubPatch): void {
   for (const n of local.nodes) {
     if (n.type === 'module') continue;
     const key = relPrefix + n.id;
-    const iv: InstVals = { v: { ...n.data.v }, sel: n.data.sel };
+    const iv: InstVals = { slots: treeToSnap(n.data.slots), sel: n.data.sel };
     if (vals[key]?.media) iv.media = true;      // preserve the instance's media override
     vals[key] = iv;
   }

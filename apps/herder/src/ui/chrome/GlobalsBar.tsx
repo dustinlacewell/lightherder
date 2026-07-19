@@ -3,6 +3,7 @@
    the compiled mirror, which must never be persisted). */
 
 import { useEffect, useReducer, useSyncExternalStore } from 'react';
+import type { Slot } from '@ldlework/dials';
 import { GLOBAL_PARAMS } from '../../patch';
 import { dispatch, engineRef, mirror } from '../../runtime';
 import { sessionStore } from '../../session';
@@ -16,7 +17,7 @@ export function GlobalsBar({ onSave }: { onSave: () => void }) {
   useSyncExternalStore(sessionStore.subscribe, sessionStore.version);
 
   /* honor a restored Res before the first tick */
-  useEffect(() => { engineRef.current?.setResolution(mirror.globals.res); }, []);
+  useEffect(() => { engineRef.current?.setResolution((mirror.globals.res as Slot<number>).dial.value); }, []);
 
   /* the op writes the mirror globals AND retunes the engine on a res
      change (that retune moved into the applier so a REMOTE res change
@@ -30,7 +31,7 @@ export function GlobalsBar({ onSave }: { onSave: () => void }) {
   return (
     <div className="globalsbar">
       {Object.entries(GLOBAL_PARAMS).map(([k, p]) => (
-        <Knob key={k} def={p} value={mirror.globals[k]} onChange={v => setGlobal(k, v)} size={38} midiTarget={`global:${k}`} />
+        <Knob key={k} def={p} value={(mirror.globals[k] as Slot<number>).dial.value} onChange={v => setGlobal(k, v)} size={38} midiTarget={`global:${k}`} />
       ))}
     </div>
   );

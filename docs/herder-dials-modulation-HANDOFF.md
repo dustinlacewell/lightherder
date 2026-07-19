@@ -34,9 +34,25 @@ survives (slimmed).
 
 ## Three phases
 
-- **Phase 1 — dials-package seams. ✅ DONE & GREEN (uncommitted).**
-- **Phase 2 — herder model / engine / persistence.** Not started.
-- **Phase 3 — herder node-UI cutover (every knob).** Not started.
+- **Phase 1 — dials-package seams. ✅ DONE & GREEN (committed `8a2eba4`).**
+- **Phase 2 — herder model / engine / persistence. 🚧 IN PROGRESS.**
+  Core layer cut over by hand (params/graph/ops/compile/library/drill/json/
+  engine/stamps/wiring/midi/mirror); UI + session + clipboard + preset +
+  persistence sweep delegated. New primitives added beyond the design:
+  `packages/dials/src/clone.ts` (`cloneSlot`/`cloneDials` — compile needs
+  fresh sources per instance), `apps/herder/src/patch/slots.ts` (path
+  resolve + snap↔tree + `applySlotOp` mirror-router body), `engine/stamps.ts`
+  (renamed from `engine/dials.ts`, glide retired to `DialMeta.lerp`,
+  StampBank keeps only fan-in stamps + mirrors each dial's `lerp` param
+  into the axis slot's `meta.lerp`), `patch/ops.ts` `isValueOp`/`isSlotValueOp`
+  (every applier classification site widened to the 4 slot ops). `InstVals.v`
+  → `InstVals.slots: DialsSnap`. `Patch.globals`/`mirror.globals` → `Dials`
+  (uniform slot model; globals unmodulated, read `.dial.value`). Engine is
+  sole sampler: one `sampleSlot` pass/tick with `ctx={dt,t}`, `paramValue`
+  combines `slot.lastSample` + wire via `meta.hints`.
+- **Phase 3 — herder node-UI cutover (every knob).** Not started. Phase 2
+  leaves the bespoke `Knob` rendering minimally working (reads
+  `slot.dial.value`); Phase 3 replaces it with `SlotRow` strips + SlotChrome.
 
 (Phase 2 is the big one; it may want sub-steps — model+ops, then engine, then
 persistence — each separately verifiable. That's sequencing within a phase, not

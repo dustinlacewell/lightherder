@@ -22,6 +22,7 @@
    useOps) is its successor for reaching the engine same-tick. */
 
 import { handleKind, type PatchEdge, type PatchNode, type SubPatch } from './graph';
+import { applySnapOverlay, cloneTree } from './slots';
 import type { EntryResolver, InstVals } from './library';
 
 const MAX_DEPTH = 16;
@@ -100,13 +101,19 @@ function expand(
    else the owning entry's default key. */
 function mergedNode(n: PatchNode, prefix: string, frames: Frame[]): PatchNode {
   const compiledId = prefix + n.id;
-  const data = { ...n.data, v: { ...n.data.v } };
+  /* a FRESH slot tree per compiled instance: cloneTree re-instantiates
+     every attached source, so two siblings never share stateful-source
+     memory (an LFO's phase, a filter's state). This is the one place the
+     tree↔mirror aliasing deliberately breaks — the value router in
+     useOps is its successor for reaching the engine same-tick. */
+  const data = { ...n.data, slots: cloneTree(n.data.slots) };
   /* frames are outermost-first; apply them innermost-first so the
-     outermost instance's values land last and win */
+     outermost instance's overlay lands last and wins. Each overlay is a
+     DialsSnap hydrated onto the live clone (value + modulation). */
   for (let i = frames.length - 1; i >= 0; i--) {
     const iv = frames[i].vals[compiledId.slice(frames[i].base.length)];
     if (iv) {
-      Object.assign(data.v, iv.v);
+      applySnapOverlay(data.slots, iv.slots);
       if (iv.sel !== undefined) data.sel = iv.sel;
     }
   }

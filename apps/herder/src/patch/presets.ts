@@ -1,5 +1,6 @@
 /* The canonical configurations — Blair's machines as patches. */
 
+import { setDial, type Slot } from '@ldlework/dials';
 import { makeEdge, makeNode, type NodeKind, type PatchEdge, type PatchNode, type SubPatch } from './graph';
 
 /* the consumer-camcorder character Blair's rig depends on (sharpening,
@@ -14,7 +15,7 @@ function patchBuilder() {
     const n = makeNode(kind, x, y, nodes);
     n.data.name = name;
     n.data.sel = sel;
-    Object.assign(n.data.v, v);
+    for (const [k, val] of Object.entries(v)) setDial(n.data.slots[k] as Slot<number>, val);
     nodes.push(n);
     return n;
   };

@@ -4,10 +4,11 @@
    globals ride along — they're part of the document, and the engine
    paces itself by them. */
 
-import { defaultGlobals, type PatchEdge, type PatchNode } from '../patch';
+import { globalSlots, type PatchEdge, type PatchNode } from '../patch';
+import type { Dials } from '@ldlework/dials';
 
 export const mirror = {
   nodes: [] as PatchNode[],
   edges: [] as PatchEdge[],
-  globals: defaultGlobals(),
+  globals: globalSlots() as Dials,
 };

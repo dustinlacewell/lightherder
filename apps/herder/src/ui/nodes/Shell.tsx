@@ -3,6 +3,7 @@
    knob drawer, and the blitted face well. */
 
 import { useCallback, useEffect, useState } from 'react';
+import type { Slot } from '@ldlework/dials';
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { DRAWER, PARAMS, type NodeData, type NodeKind } from '../../patch';
 import { dispatch, releaseNode, setFace, spark, tap } from '../../runtime';
@@ -162,7 +163,7 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
         <div className="drawer nodrag">
           {DRAWER[kind].map(k => (
             <Knob
-              key={k} def={PARAMS[kind][k]} value={data.v[k]} onChange={v => setParam(k, v)} midiTarget={`${id}:${k}`}
+              key={k} def={PARAMS[kind][k]} value={(data.slots[k] as Slot<number>).dial.value} onChange={v => setParam(k, v)} midiTarget={`${id}:${k}`}
               port={{ on: exposed.includes(k), toggle: () => togglePort(k) }}
             />
           ))}

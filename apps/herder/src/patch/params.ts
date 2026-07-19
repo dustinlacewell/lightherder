@@ -2,6 +2,7 @@
    its range, default, formatting, and how a control signal rides it.
    Pure data; the engine resolves effective values, the UI draws them. */
 
+import { dial, type Dials, type Slot } from '@ldlework/dials';
 import type { NodeKind } from './graph';
 
 export interface ParamDef {
@@ -168,4 +169,60 @@ export function defaultValues(kind: NodeKind): Record<string, number> {
 /** default values for the transport globals */
 export function defaultGlobals(): Record<string, number> {
   return Object.fromEntries(Object.entries(GLOBAL_PARAMS).map(([k, p]) => [k, p.def]));
+}
+
+/* ---- the slot model — every param is a dials Slot ---------------------- */
+
+/* What the engine's wire-combine and the formatter still need off a
+   ParamDef once the value lives on a Slot. `polarity` is resolved (never
+   inferred at read time); `fmt` rides along so the UI can format without
+   re-consulting PARAMS. Discrete params (mode/res/video, delay/size…)
+   set `step`; the panel shows no attach picker where modulation makes no
+   sense, but the shape stays uniform. */
+export interface ParamHints extends Record<string, unknown> {
+  periodic: boolean;
+  cmin?: number;
+  cmax?: number;
+  polarity: 'uni' | 'bi';
+  fmt: (v: number) => string;
+}
+
+/** the resolved hints an engine/UI reader pulls off a slot's meta */
+export function paramHints(def: ParamDef): ParamHints {
+  return {
+    periodic: def.periodic ?? false,
+    ...(def.cmin !== undefined ? { cmin: def.cmin } : {}),
+    ...(def.cmax !== undefined ? { cmax: def.cmax } : {}),
+    polarity: polarityOf(def),
+    fmt: def.fmt,
+  };
+}
+
+/** build a fresh Slot for one param — the value store the tree carries.
+    min/max/def/step/desc map onto DialMeta; the engine-only bits ride in
+    `meta.hints`. `initial` is the def, so reset-to-home works for free. */
+export function slotFor(def: ParamDef): Slot<number> {
+  return dial(def.def, {
+    label: def.label,
+    min: def.min,
+    max: def.max,
+    ...(def.step !== undefined ? { step: def.step } : {}),
+    description: def.desc,
+    hints: paramHints(def),
+  });
+}
+
+/** the full slot tree a fresh device of `kind` boots with */
+export function slotsFor(kind: NodeKind): Dials {
+  const out: Dials = {};
+  for (const [k, def] of Object.entries(PARAMS[kind])) out[k] = slotFor(def);
+  return out;
+}
+
+/** the transport globals as a slot tree (video/res — not modulatable,
+    but slots for a uniform read model) */
+export function globalSlots(): Dials {
+  const out: Dials = {};
+  for (const [k, def] of Object.entries(GLOBAL_PARAMS)) out[k] = slotFor(def);
+  return out;
 }

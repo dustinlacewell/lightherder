@@ -3,9 +3,11 @@
    validated field by field, so a hostile or stale document degrades
    to nothing rather than a broken bench. */
 
+import { setDial, type DialsSnap, type Slot, type SlotSnap } from '@ldlework/dials';
 import { makeEdge, makeNode, SWITCH_INS, validConnection, type NodeKind, type Patch, type PatchEdge, type PatchNode, type SubPatch } from './graph';
 import type { InstVals } from './library';
-import { GLOBAL_PARAMS, PARAMS } from './params';
+import { GLOBAL_PARAMS, PARAMS, globalSlots } from './params';
+import { applySnapOverlay, treeToSnap } from './slots';
 
 const KINDS: NodeKind[] = ['media', 'draw', 'camera', 'monitor', 'mixer', 'switch', 'dial', 'xypad', 'in', 'out', 'module'];
 const MAX_DEPTH = 16;
@@ -16,7 +18,7 @@ export function graphToJSON(g: SubPatch): { nodes: object[]; edges: object[] } {
   return {
     nodes: g.nodes.map(n => ({
       id: n.id, type: n.type, x: n.position.x, y: n.position.y,
-      name: n.data.name, v: n.data.v, sel: n.data.sel,
+      name: n.data.name, slots: treeToSnap(n.data.slots), sel: n.data.sel,
       momentary: n.data.momentary, open: n.data.open,
       ...(n.data.flavor ? { flavor: n.data.flavor } : {}),
       /* post-migration every module is a reference — `patch` is no longer
@@ -62,9 +64,20 @@ export function graphFromJSON(d: unknown, depth = 0): SubPatch | null {
         if (r.vals && typeof r.vals === 'object') n.data.vals = parseVals(r.vals);
         if (r.patch) n.data.patch = graphFromJSON(r.patch, depth + 1) ?? { nodes: [], edges: [] };
       }
-      for (const [k, p] of Object.entries(PARAMS[kind])) {
-        const val = r.v?.[k];
-        if (typeof val === 'number' && isFinite(val)) n.data.v[k] = Math.min(p.max, Math.max(p.min, val));
+      /* the slot tree: a current save carries `slots: DialsSnap`
+         (values AND modulation) hydrated over the fresh defaults; an old
+         save carries `v: {k:num}` — migrate it by setting each slot's
+         value. Either way setDial/fromJSON clamp to each slot's range, so
+         a hostile field degrades rather than breaking the bench. */
+      if (r.slots && typeof r.slots === 'object') {
+        applySnapOverlay(n.data.slots, sanitizeSnap(r.slots, kind));
+      } else if (r.v && typeof r.v === 'object') {
+        for (const k of Object.keys(PARAMS[kind])) {
+          const val = r.v[k];
+          if (typeof val === 'number' && isFinite(val)) {
+            setDial(n.data.slots[k] as Slot<number>, val);
+          }
+        }
       }
       nodes.push(n);
     }
@@ -81,18 +94,55 @@ export function graphFromJSON(d: unknown, depth = 0): SubPatch | null {
   }
 }
 
-/** an instance's stored values, validated per rel key — v is a
-    finite-number map, sel a rounded int, media a bool. A hostile or
-    stale entry degrades to an empty v rather than a broken instance. */
+/** keep only a snap's known param keys and coerce each slot level to
+    JSON-legal shape (finite value; depth in [0,1]; mode/attached passed
+    through for dials' fromJSON to validate). Unknown keys are dropped;
+    the source registry check happens later via onMissingSource:'drop'. */
+function sanitizeSnap(raw: Record<string, any>, kind: NodeKind): DialsSnap {
+  const out: DialsSnap = {};
+  for (const k of Object.keys(PARAMS[kind])) {
+    const s = raw[k];
+    if (s && typeof s === 'object') out[k] = sanitizeSlotSnap(s);
+  }
+  return out;
+}
+
+/** one slot level of a snap, sanitized recursively through its attached
+    source's params — a stale/hostile field just falls away */
+function sanitizeSlotSnap(s: Record<string, any>): SlotSnap {
+  const out: SlotSnap = {
+    value: typeof s.value === 'number' && isFinite(s.value) ? s.value : 0,
+  };
+  if (typeof s.depth === 'number' && isFinite(s.depth)) out.depth = Math.max(0, Math.min(1, s.depth));
+  if (s.mode === 'center' || s.mode === 'up' || s.mode === 'down') out.mode = s.mode;
+  if (s.attached && typeof s.attached === 'object' && typeof s.attached.name === 'string') {
+    const params: Record<string, SlotSnap> = {};
+    const ap = s.attached.params;
+    if (ap && typeof ap === 'object')
+      for (const [pk, pv] of Object.entries(ap))
+        if (pv && typeof pv === 'object') params[pk] = sanitizeSlotSnap(pv as Record<string, any>);
+    out.attached = { name: s.attached.name, params };
+  }
+  return out;
+}
+
+/** an instance's stored overlay, validated per rel key — `slots` is a
+    sanitized DialsSnap (values + modulation), sel a rounded int, media a
+    bool. A hostile or stale entry degrades to an empty overlay rather
+    than a broken instance. The prototype's kind is unknown here (the rel
+    key names a path, not a kind), so slot levels are sanitized
+    structurally; compile hydrates them onto the real default tree, where
+    unknown keys and missing sources fall away. */
 function parseVals(d: Record<string, any>): Record<string, InstVals> {
   const out: Record<string, InstVals> = {};
   for (const [rel, raw] of Object.entries(d)) {
     if (!raw || typeof raw !== 'object') continue;
-    const v: Record<string, number> = {};
-    if (raw.v && typeof raw.v === 'object')
-      for (const [k, val] of Object.entries(raw.v))
-        if (typeof val === 'number' && isFinite(val)) v[k] = val;
-    const iv: InstVals = { v };
+    const slots: DialsSnap = {};
+    const src = raw.slots ?? migrateLegacyVals(raw.v);
+    if (src && typeof src === 'object')
+      for (const [k, s] of Object.entries(src))
+        if (s && typeof s === 'object') slots[k] = sanitizeSlotSnap(s as Record<string, any>);
+    const iv: InstVals = { slots };
     if (typeof raw.sel === 'number' && isFinite(raw.sel)) iv.sel = Math.max(0, Math.round(raw.sel));
     if (raw.media === true) iv.media = true;
     out[rel] = iv;
@@ -100,22 +150,51 @@ function parseVals(d: Record<string, any>): Record<string, InstVals> {
   return out;
 }
 
+/** an old instance overlay stored `v: {k:num}`; lift it to snap levels */
+function migrateLegacyVals(v: unknown): Record<string, SlotSnap> | null {
+  if (!v || typeof v !== 'object') return null;
+  const out: Record<string, SlotSnap> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>))
+    if (typeof val === 'number' && isFinite(val)) out[k] = { value: val };
+  return out;
+}
+
 /** the whole bench as JSON — the graph tree plus the globals. MIDI
     bindings travel separately (see the midi module) — they're keyed to
     node ids, which a paste or preset rebuild replaces wholesale. */
 export function patchToJSON(p: Patch): object {
-  return { v: 1, globals: p.globals, ...graphToJSON({ nodes: p.nodes, edges: p.edges }) };
+  return { v: 1, globals: treeToSnap(p.globals), ...graphToJSON({ nodes: p.nodes, edges: p.edges }) };
 }
 
 /** rebuild a whole bench from parsed JSON; null if it doesn't look
-    like one */
+    like one. Globals hydrate a fresh slot tree — a current save carries
+    `globals: DialsSnap`, an old one a `{k:num}` map (migrated per key). */
 export function patchFromJSON(d: unknown): Patch | null {
   const g = graphFromJSON(d);
   if (!g) return null;
   const f = d as Record<string, any>;
-  const globals = Object.fromEntries(Object.entries(GLOBAL_PARAMS).map(([k, p]) => {
-    const val = f.globals?.[k];
-    return [k, typeof val === 'number' && isFinite(val) ? Math.min(p.max, Math.max(p.min, val)) : p.def];
-  }));
+  const globals = globalSlots();
+  const raw = f.globals;
+  if (raw && typeof raw === 'object') {
+    const legacy = Object.values(raw).some(v => typeof v === 'number');
+    if (legacy) {
+      for (const k of Object.keys(GLOBAL_PARAMS)) {
+        const val = raw[k];
+        if (typeof val === 'number' && isFinite(val)) setDial(globals[k] as Slot<number>, val);
+      }
+    } else {
+      applySnapOverlay(globals, sanitizeGlobalSnap(raw));
+    }
+  }
   return { ...g, globals };
+}
+
+/** a globals snap kept to its known keys and sanitized per level */
+function sanitizeGlobalSnap(raw: Record<string, any>): DialsSnap {
+  const out: DialsSnap = {};
+  for (const k of Object.keys(GLOBAL_PARAMS)) {
+    const s = raw[k];
+    if (s && typeof s === 'object') out[k] = sanitizeSlotSnap(s);
+  }
+  return out;
 }

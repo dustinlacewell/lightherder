@@ -20,13 +20,18 @@
    Nothing here imports above patch/: the library travels as pure data,
    passed in. The live singleton that persists it lives in persist/. */
 
+import type { DialsSnap } from '@ldlework/dials';
 import type { PatchEdge, PatchNode, SubPatch } from './graph';
+import { cloneTree } from './slots';
 
-/** what an instance remembers for one prototype node: its knob values,
-    its switch selection, and whether it replaced the node's media file
-    with its own (else the entry's default blob rides) */
+/** what an instance remembers for one prototype node: its slot overlay
+    (a DialsSnap — values AND modulation, since a param can be modulated
+    across a ref boundary), its switch selection, and whether it replaced
+    the node's media file with its own (else the entry's default blob
+    rides). The overlay is serializable state; compile hydrates it onto
+    a fresh clone of the prototype's default tree. */
 export interface InstVals {
-  v: Record<string, number>;
+  slots: DialsSnap;
   sel?: number;
   media?: boolean;
 }
@@ -150,7 +155,7 @@ interface ValLayer { base: string; vals: Record<string, InstVals> }
     outermost first. */
 export function bakeEntry(level: SubPatch, prefix: string, overlays: ValLayer[]): SubPatch {
   const nodes: PatchNode[] = level.nodes.map(n => {
-    const data = { ...n.data, v: { ...n.data.v } };
+    const data = { ...n.data, slots: cloneTree(n.data.slots) };
     if (n.type === 'module') data.vals = bakeModuleVals(n, prefix, overlays);
     return { ...n, position: { ...n.position }, data };
   });
@@ -180,8 +185,15 @@ function bakeModuleVals(m: PatchNode, prefix: string, overlays: ValLayer[]): Rec
 }
 
 function cloneInst(iv: InstVals): InstVals {
-  const out: InstVals = { v: { ...iv.v } };
+  const out: InstVals = { slots: cloneSnap(iv.slots) };
   if (iv.sel !== undefined) out.sel = iv.sel;
   if (iv.media) out.media = true;
   return out;
+}
+
+/* a DialsSnap is plain JSON-shaped state (value/depth/mode + nested
+   attached params) — a structural deep copy severs the overlay from the
+   tree it was captured off */
+function cloneSnap(snap: DialsSnap): DialsSnap {
+  return structuredClone(snap);
 }

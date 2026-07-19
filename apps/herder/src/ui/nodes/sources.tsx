@@ -2,6 +2,7 @@
    dropped media, and the hand-painted draw surface. */
 
 import { useCallback, useRef } from 'react';
+import type { Slot } from '@ldlework/dials';
 import { PARAMS } from '../../patch';
 import { loadStoredMedia } from '../../persist';
 import { dispatch, drawClear, drawCommit, drawStroke, emitEph, engineRef, gateMode, mirror, setFace } from '../../runtime';
@@ -113,14 +114,14 @@ export function DrawNode({ id, data }: DeviceProps) {
           onPointerDown={e => {
             e.currentTarget.setPointerCapture(e.pointerId);
             const p = norm(e);
-            drawStroke(id, p.x, p.y, p.x, p.y, data.v.hue, data.v.size);
+            drawStroke(id, p.x, p.y, p.x, p.y, (data.slots.hue as Slot<number>).dial.value, (data.slots.size as Slot<number>).dial.value);
             last.current = p;
           }}
           onPointerMove={e => {
             const l = last.current;
             if (!l) return;
             const p = norm(e);
-            drawStroke(id, l.x, l.y, p.x, p.y, data.v.hue, data.v.size);
+            drawStroke(id, l.x, l.y, p.x, p.y, (data.slots.hue as Slot<number>).dial.value, (data.slots.size as Slot<number>).dial.value);
             last.current = p;
           }}
           onPointerUp={() => { last.current = null; drawCommit(id); }}
@@ -128,22 +129,22 @@ export function DrawNode({ id, data }: DeviceProps) {
         />
       }
     >
-      <div className="drawrows nodrag" style={{ '--hue': String(data.v.hue) } as React.CSSProperties}>
+      <div className="drawrows nodrag" style={{ '--hue': String((data.slots.hue as Slot<number>).dial.value) } as React.CSSProperties}>
         <label className="drow" title={PARAMS.draw.hue.desc}>
           <span>Hue</span>
           <input
             type="range" className="dslider hue-slider" min={0} max={360} step={1}
-            value={data.v.hue} onChange={e => setParam('hue', Number(e.target.value))}
+            value={(data.slots.hue as Slot<number>).dial.value} onChange={e => setParam('hue', Number(e.target.value))}
           />
-          <span className="dval">{PARAMS.draw.hue.fmt(data.v.hue)}</span>
+          <span className="dval">{PARAMS.draw.hue.fmt((data.slots.hue as Slot<number>).dial.value)}</span>
         </label>
         <label className="drow" title={PARAMS.draw.size.desc}>
           <span>Size</span>
           <input
             type="range" className="dslider size-slider" min={1} max={60} step={1}
-            value={data.v.size} onChange={e => setParam('size', Number(e.target.value))}
+            value={(data.slots.size as Slot<number>).dial.value} onChange={e => setParam('size', Number(e.target.value))}
           />
-          <span className="dval">{PARAMS.draw.size.fmt(data.v.size)}</span>
+          <span className="dval">{PARAMS.draw.size.fmt((data.slots.size as Slot<number>).dial.value)}</span>
         </label>
       </div>
       <VPort dir="out" id="v:out" top={95} desc="the drawing — this device's picture" />
