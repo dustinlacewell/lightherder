@@ -28,7 +28,8 @@ import {
   SlotActionsProvider, type LiveOverride, type SlotActions,
 } from '@ldlework/dials/react';
 import { makeDialPanelComponents } from '@ldlework/phosphor-dials';
-import { dispatch, liveValue } from '../../runtime';
+import { resolveSlot } from '../../patch';
+import { dispatch, liveValue, mirror } from '../../runtime';
 import { SlotChrome } from './SlotChrome';
 
 /* the level-local op target: the shell holds the compiled view id, and
@@ -120,11 +121,33 @@ function fullActions(a: Partial<SlotActions>): SlotActions {
 
     Gating on presence at resolve time means the drawer must re-render
     when a wire starts or stops riding; `Drawer` subscribes each param to
-    `watchLive` for exactly that. */
+    `watchLive` for exactly that.
+
+    THE MODULE CASE. The engine samples the MIRROR node's slot tree and
+    writes `lastSample` there. At the root level the drawer's slot IS the
+    mirror slot (compile shares it by reference), so the SlotRow's own
+    `lastSample` stash animates for free. Inside a ref instance, though,
+    the drilled VIEW clones its own slot tree (drill's `mergeInto`) and
+    the mirror clones its own (compile's `mergedNode`) — two independent
+    clones. The engine only ever samples the mirror's, so the view slot's
+    `lastSample` stays undefined and a modulated knob looks frozen. So
+    when the view slot is NOT the mirror slot, ride the mirror slot's
+    `lastSample` — the engine truth for this compiled id + path. */
 export function liveOverrideFor(id: string): LiveOverride {
-  return (path: string[], _slot: Slot<unknown>) => {
+  return (path: string[], viewSlot: Slot<unknown>) => {
     const target = `${id}:${keyOf(path)}`;
-    return liveValue(target) === undefined ? undefined : () => liveValue(target);
+    /* a control-port wire's engine value wins when one rides */
+    if (liveValue(target) !== undefined) return () => liveValue(target);
+    /* module case: the view slot is a clone, so the engine never wrote
+       its lastSample — ride the mirror clone's instead */
+    const m = mirror.nodes.find(n => n.id === id);
+    const mirrorSlot = m ? resolveSlot(m.data.slots, keyOf(path)) : null;
+    if (mirrorSlot && mirrorSlot !== viewSlot) {
+      return () => mirrorSlot.lastSample as number | undefined;
+    }
+    /* root case: view slot IS the mirror slot — the SlotRow's own
+       lastSample stash already animates, so decline */
+    return undefined;
   };
 }
 
