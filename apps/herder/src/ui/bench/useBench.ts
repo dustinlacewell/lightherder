@@ -139,11 +139,24 @@ export function useBench(): Bench {
       }
     }
   }
-  /* the engine's graph. A lib-rooted path SOLOS the shelf-entered entry:
-     a synthetic one-module root compiles the entry's innards — defaults
-     merged, media keys stamped, cycles guarded — under the exact ids the
-     view holds, so faces, rings, sparks and the writeParam router all
-     line up. The bench graph parks until the path returns; the release
+  /* the engine's graph — recompiled on STRUCTURE only (pathKey, docVer),
+     never on React render identity. `nodes`/`edges` are deliberately NOT
+     deps: React Flow state changes identity on every selection click,
+     drag frame and knob gesture, and a recompile re-clones every module
+     instance's slot tree (fresh modulation sources — an LFO's phase
+     resets), so keying the compile on render identity let pure UI noise
+     perturb the engine's modulation state. Values reach the engine
+     render-free instead (slot aliasing at the root, the writeParam /
+     syncMirrorViewed patches under a ref); every structural mutation
+     path bumps docVer. The write-back above runs before this memo in
+     render order, so a bumped compile always reads the freshly written
+     tree.
+
+     A lib-rooted path SOLOS the shelf-entered entry: a synthetic
+     one-module root compiles the entry's innards — defaults merged,
+     media keys stamped, cycles guarded — under the exact ids the view
+     holds, so faces, rings, sparks and the writeParam router all line
+     up. The bench graph parks until the path returns; the release
      effect below sweeps whichever graph just left. */
   const flat = useMemo(() => {
     const eid = path.length ? libHead(path[0].id) : null;
@@ -158,7 +171,8 @@ export function useBench(): Bench {
       return compile(soloRoot, libStore.resolve);
     }
     return compile(rootRef.current, libStore.resolve);
-  }, [nodes, edges, pathKey, docVer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathKey, docVer]);
   mirror.nodes = flat.nodes;
   mirror.edges = flat.edges;
 
@@ -219,7 +233,11 @@ export function useBench(): Bench {
     for (const n of nodesRef.current) if (n.selected) sel.add(n.id);
     setNodes(v.nodes.map(n => (sel.has(n.id) ? { ...n, selected: true } : n)));
     setEdges(wires(v.edges));
-  }, [path, pathKey, prefix, libVer, setNodes, setEdges]);
+    /* a FOREIGN entry edit reshaped structure the compile can no longer
+       discover from RF identity — recompile. A plain path change already
+       recompiles through the memo's pathKey dep. */
+    if (staleLib) bumpDoc();
+  }, [path, pathKey, prefix, libVer, setNodes, setEdges, bumpDoc]);
 
   /* drill into a module (its ⤢ button / double-click hands us the
      view id), and climb back out on the breadcrumb. A ref module attaches
@@ -315,8 +333,10 @@ export function useBench(): Bench {
        no-op with no live session. */
     const dragging: { id: string; x: number; y: number }[] = [];
     let settled = false;
+    let removed = false;
     for (const ch of changes) {
       if (ch.type === 'remove') {
+        removed = true;
         releaseNode(ch.id);
         if (ctx?.kind === 'entry') {
           const localId = strip(ch.id);
@@ -346,7 +366,13 @@ export function useBench(): Bench {
     if (dragging.length) announcePresence({ drag: dragging });
     else if (settled) announcePresence({ drag: undefined });
     onNodesChange(changes);
-  }, [onNodesChange, strip, path, prefix]);
+    /* the compile no longer watches RF identity, so a removal RF applied
+       locally must reach the mirror explicitly — the bump lands after the
+       write-back of the very render this change provokes. Covers a local
+       Delete AND the settling echo of a remote removeNode (whose early
+       bump ran before RF's async removal had reached the tree). */
+    if (removed) bumpDoc();
+  }, [onNodesChange, strip, path, prefix, bumpDoc]);
 
   /* React Flow applies an edge deletion (a selected wire hit with Delete)
      locally itself, and until M3 that removal never reached the op stream
@@ -373,7 +399,10 @@ export function useBench(): Bench {
         if (!consumeEcho(ch.id)) record({ kind: 'disconnect', scope, id: strip(ch.id) });
     }
     onEdgesChange(changes);
-  }, [onEdgesChange, strip, path]);
+    /* same as handleNodesChange: RF applied the drop locally; the mirror
+       only learns of it through a doc bump now */
+    if (removes.length) bumpDoc();
+  }, [onEdgesChange, strip, path, bumpDoc]);
 
   /* a new connection: the fan-in / one-wire semantics live in the
      applier — here we just hand it the edge (compiled ids, the viewed

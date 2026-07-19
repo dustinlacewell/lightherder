@@ -199,8 +199,8 @@ export function applyOp(root: SubPatch, globals: Dials, lib: LibraryDoc, op: Op)
    compiled mirror, so a data edit mutates the SAME object in place —
    that aliasing is what an unmounted engine/MIDI read sees, with no
    recompile to re-establish it. (On the VIEWED level the applier never
-   comes here: it routes through React Flow, whose write-back + recompile
-   own the mirror.) */
+   comes here: it routes through React Flow and syncs the mirror
+   explicitly — syncMirrorViewed in useOps.) */
 function withData(level: SubPatch, id: string, edit: (d: NodeData) => void): OpEffect {
   const n = level.nodes.find(n => n.id === id);
   if (n) edit(n.data);

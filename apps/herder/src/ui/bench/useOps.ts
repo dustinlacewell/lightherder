@@ -168,7 +168,10 @@ export function useOps(deps: OpsDeps): (op: Op, opts: DispatchOpts) => Op {
        still bumps the doc (isStructural) so the recompile re-stamps the
        node's mediaKey and the engine reads the newly-stored blob. */
     const inPlace = opts.silent || op.kind === 'markMedia' || path.join('/') !== viewPath().join('/');
-    if (!inPlace) applyViewed(rf, setNodes, setEdges, op);
+    if (!inPlace) {
+      applyViewed(rf, setNodes, setEdges, op);
+      syncMirrorViewed(op, canon.scope.kind === 'entry', bumpDoc);
+    }
     else {
       applyOp(root(), mirror.globals, libStore.doc, canon);
       writeParam(rf, op, canon);
@@ -277,6 +280,7 @@ function applyCanonical(
        bouncing this op back onto the wire. */
     armEcho(rf, viewedOp);
     applyViewed(rf, setNodes, setEdges, viewedOp);
+    syncMirrorViewed(viewedOp, scope.kind === 'entry', bumpDoc);
     return;
   }
 
@@ -429,6 +433,55 @@ function writeParamRemote(
   if (m) put(m.data);
   const rn = rf.getNode(compiledId);
   if (rn) put(rn.data as NodeData);
+}
+
+/* ---- the viewed-branch mirror sync ------------------------------------ */
+
+/* The flat compile is keyed on the doc version — never on React Flow
+   state identity (a recompile re-clones every module instance's slot
+   tree, resetting each attached source's state, so render noise must
+   never trigger one). An op applyViewed just landed through React Flow
+   therefore reaches the engine explicitly, by op class:
+
+     · a VALUE op patches the compiled mirror node in place — the same
+       write the silent/unmounted path makes. At the root the mirror
+       shares the view's slot objects and the re-apply is idempotent;
+       under a ref (a drilled level, a shelf solo) the mirror holds its
+       own clone and this write IS what the engine feels. No recompile.
+
+     · a data-FIELD op (setProp, rename, moveNode) patches the mirror
+       node in place too — recompiling for a drawer toggle or a rename
+       would reset module modulation for nothing. An entry-scoped one
+       edits a SHARED definition whose sibling instances must remerge,
+       so that one recompiles.
+
+     · a STRUCTURAL op reshaped the graph — bump the doc version; the
+       render-time write-back lands the RF state in the tree before the
+       memoized compile re-runs. RF's ASYNC removals (deleteElements,
+       the setEdges batch) additionally bump from handleNodesChange /
+       handleEdgesChange when they settle, so the mirror catches up even
+       though this bump ran before RF applied them. */
+function syncMirrorViewed(
+  op: Exclude<Op, { kind: 'setGlobal' | 'replaceGraph' | 'entryCreate' | 'entryRename' | 'entryDelete' }>,
+  entryScoped: boolean,
+  bumpDoc: () => void,
+): void {
+  if (isSlotValueOp(op) || op.kind === 'setSel') {
+    const m = mirror.nodes.find(n => n.id === op.node);
+    if (!m) return;
+    if (op.kind === 'setSel') m.data.sel = op.i;
+    else applySlotOp(m.data.slots, op);
+    return;
+  }
+  if (!entryScoped && (op.kind === 'setProp' || op.kind === 'rename' || op.kind === 'moveNode')) {
+    const m = mirror.nodes.find(n => n.id === op.node);
+    if (!m) return;
+    if (op.kind === 'setProp') m.data[op.key] = op.v;
+    else if (op.kind === 'rename') m.data.name = op.name;
+    else m.position = { x: op.x, y: op.y };
+    return;
+  }
+  bumpDoc();
 }
 
 /* ---- the writeParam router (the aliasing's successor) ----------------- */

@@ -28,7 +28,7 @@ import {
   SlotActionsProvider, type LiveOverride, type SlotActions,
 } from '@ldlework/dials/react';
 import { makeDialPanelComponents } from '@ldlework/phosphor-dials';
-import { resolveSlot } from '../../patch';
+import { libHead, resolveSlot } from '../../patch';
 import { dispatch, liveValue, mirror } from '../../runtime';
 import { SlotChrome } from './SlotChrome';
 
@@ -78,17 +78,28 @@ export function useSlotNode(): SlotNode | null {
    tree (aliased into the mirror, so the engine feels it same-tick).
    `setLerp` is a no-op: a device drawer param has no glide story (its
    slot carries no meta.lerp, so phosphor never renders the control) —
-   only dial/xypad axes glide, and those stay bespoke widgets. */
+   only dial/xypad axes glide, and those stay bespoke widgets.
+
+   Doc-level drawer gestures ride the SILENT route, exactly as a MIDI CC
+   does: the op writes the tree in place (aliased into the mirror at the
+   root, writeParam under a ref) and the SlotRow repaints itself via
+   onChange — no React Flow render, no write-back, no recompile per
+   pointermove. A shelf-entered entry view (a lib-rooted id) keeps the
+   RF route instead: its render-time write-back owns the entry
+   persistence (entryDirty → libStore.touch, own-bump accounted), where
+   a silent entry write would version-bump the library on every move and
+   reproject the whole view. */
 function herderActions(id: string): Partial<SlotActions> {
+  const opts = { silent: libHead(id.split('/')[0]) === null };
   return {
     setValue: (path, _slot, v) =>
-      dispatch({ kind: 'setParam', scope: at(), node: id, key: keyOf(path), v: v as number }),
+      dispatch({ kind: 'setParam', scope: at(), node: id, key: keyOf(path), v: v as number }, opts),
     attach: (path, _slot, source) =>
-      dispatch({ kind: 'slotAttach', scope: at(), node: id, key: keyOf(path), source }),
+      dispatch({ kind: 'slotAttach', scope: at(), node: id, key: keyOf(path), source }, opts),
     setDepth: (path, _slot, depth) =>
-      dispatch({ kind: 'slotDepth', scope: at(), node: id, key: keyOf(path), depth }),
+      dispatch({ kind: 'slotDepth', scope: at(), node: id, key: keyOf(path), depth }, opts),
     setMode: (path, _slot, mode) =>
-      dispatch({ kind: 'slotMode', scope: at(), node: id, key: keyOf(path), mode }),
+      dispatch({ kind: 'slotMode', scope: at(), node: id, key: keyOf(path), mode }, opts),
     setLerp: () => {},
   };
 }
@@ -139,11 +150,23 @@ export function liveOverrideFor(id: string): LiveOverride {
     /* a control-port wire's engine value wins when one rides */
     if (liveValue(target) !== undefined) return () => liveValue(target);
     /* module case: the view slot is a clone, so the engine never wrote
-       its lastSample — ride the mirror clone's instead */
+       its lastSample — ride the mirror clone's instead. The mirror node
+       is REPLACED by every structural recompile (fresh clones), while
+       this accessor lives as long as the rendered row, so re-resolve
+       whenever mirror.nodes has moved — or the knob would keep riding an
+       orphaned clone and freeze. O(1) while the mirror is stable. */
     const m = mirror.nodes.find(n => n.id === id);
-    const mirrorSlot = m ? resolveSlot(m.data.slots, keyOf(path)) : null;
+    let mirrorSlot = m ? resolveSlot(m.data.slots, keyOf(path)) : null;
     if (mirrorSlot && mirrorSlot !== viewSlot) {
-      return () => mirrorSlot.lastSample as number | undefined;
+      let compiled = mirror.nodes;
+      return () => {
+        if (mirror.nodes !== compiled) {
+          compiled = mirror.nodes;
+          const m2 = compiled.find(n => n.id === id);
+          mirrorSlot = m2 ? resolveSlot(m2.data.slots, keyOf(path)) : null;
+        }
+        return mirrorSlot?.lastSample as number | undefined;
+      };
     }
     /* root case: view slot IS the mirror slot — the SlotRow's own
        lastSample stash already animates, so decline */
