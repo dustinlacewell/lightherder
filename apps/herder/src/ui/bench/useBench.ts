@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { useEdgesState, useNodesState, type Connection, type EdgeChange, type IsValidConnection, type NodeChange } from '@xyflow/react';
 import {
-  carryOrphanEdges, compile, instancePrefixes, levelAt, libCrumbId, libHead, makeEdge, projectLevel,
+  adoptSources, carryOrphanEdges, compile, instancePrefixes, levelAt, libCrumbId, libHead, makeEdge, projectLevel,
   slotsFor, sweepEntryVals, treeToSnap, unproject, validConnection, viewContext, type Crumb, type InstVals, type SubPatch, type ViewCtx,
 } from '../../patch';
 import { libStore } from '../../persist';
@@ -158,19 +158,27 @@ export function useBench(): Bench {
      holds, so faces, rings, sparks and the writeParam router all line
      up. The bench graph parks until the path returns; the release
      effect below sweeps whichever graph just left. */
+  /* the previous compile — the release effect diffs against it, and the
+     memo adopts surviving source state from it (null until the first
+     commit; the boot compile legitimately starts fresh) */
+  const prevFlatRef = useRef<SubPatch | null>(null);
   const flat = useMemo(() => {
     const eid = path.length ? libHead(path[0].id) : null;
-    if (eid !== null) {
-      const soloRoot: SubPatch = {
-        nodes: [{
-          id: path[0].id, type: 'module', position: { x: 0, y: 0 },
-          data: { name: '', slots: slotsFor('module'), sel: 0, momentary: false, open: false, ref: eid, vals: {} },
-        }],
-        edges: [],
-      };
-      return compile(soloRoot, libStore.resolve);
-    }
-    return compile(rootRef.current, libStore.resolve);
+    const soloRoot: SubPatch | null = eid !== null ? {
+      nodes: [{
+        id: path[0].id, type: 'module', position: { x: 0, y: 0 },
+        data: { name: '', slots: slotsFor('module'), sel: 0, momentary: false, open: false, ref: eid, vals: {} },
+      }],
+      edges: [],
+    } : null;
+    const out = compile(soloRoot ?? rootRef.current, libStore.resolve);
+    /* a recompile re-clones module slot trees; carry each surviving
+       instance's source state (LFO phase, filter memory, lastSample)
+       across, so a structural edit doesn't skip every module's
+       modulation. Path swaps (bench↔solo) share no compiled ids, so
+       the adoption is a no-op across them. */
+    if (prevFlatRef.current) adoptSources(prevFlatRef.current.nodes, out.nodes);
+    return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathKey, docVer]);
   mirror.nodes = flat.nodes;
@@ -181,11 +189,10 @@ export function useBench(): Bench {
      rings, faces and gestures, or they linger against ids the engine no
      longer runs. Removals inside a level are already released at their
      call sites; releaseNode is idempotent, so the overlap is free. */
-  const prevFlatRef = useRef(flat);
   useEffect(() => {
     const prev = prevFlatRef.current;
-    if (prev === flat) return;
     prevFlatRef.current = flat;
+    if (!prev || prev === flat) return;
     const live = new Set(flat.nodes.map(n => n.id));
     for (const n of prev.nodes) if (!live.has(n.id)) releaseNode(n.id);
   }, [flat]);
@@ -427,13 +434,20 @@ export function useBench(): Bench {
     const flat2 = compile(next, libStore.resolve);
     mirror.nodes = flat2.nodes;
     mirror.edges = flat2.edges;
+    /* a wholesale swap starts FRESH: null the adoption baseline (no old
+       source state bleeds into coincidentally same-id nodes) and bump the
+       doc — the flat memo no longer watches RF identity, so without the
+       bump the next render would clamp the mirror back to the stale
+       memoized compile. */
+    prevFlatRef.current = null;
+    bumpDoc();
     viewKeyRef.current = { key: '' };
     setPath([]);
     const v = projectLevel(next, '', undefined, libStore.resolve);
     setNodes(v.nodes);
     setEdges(wires(v.edges));
     midi.pruneBindings();
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, bumpDoc]);
 
   const level = useCallback(() => levelAt(rootRef.current, path, libStore.resolve), [path]);
   const root = useCallback(() => rootRef.current, []);

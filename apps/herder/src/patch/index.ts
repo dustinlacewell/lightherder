@@ -21,7 +21,7 @@ export {
   refClosure, instancePrefixes, sweepEntryVals, bakeEntry,
   type InstVals, type LibEntryDef, type LibraryDoc, type EntryResolver,
 } from './library';
-export { compile } from './compile';
+export { compile, adoptSources } from './compile';
 export { levelAt, viewContext, projectLevel, unproject, carryOrphanEdges, libCrumbId, libHead, type Crumb, type ViewCtx, type Overlay } from './drill';
 export { resolveCompiled, type Resolved } from './resolve';
 export {

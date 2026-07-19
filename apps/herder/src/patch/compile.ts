@@ -22,7 +22,7 @@
    useOps) is its successor for reaching the engine same-tick. */
 
 import { handleKind, type PatchEdge, type PatchNode, type SubPatch } from './graph';
-import { applySnapOverlay, cloneTree } from './slots';
+import { adoptTreeState, applySnapOverlay, cloneTree } from './slots';
 import type { EntryResolver, InstVals } from './library';
 
 const MAX_DEPTH = 16;
@@ -42,6 +42,22 @@ export function compile(root: SubPatch, resolve: EntryResolver = () => null): Su
   const edges: PatchEdge[] = [];
   expand('', root, nodes, edges, 0, resolve, [], new Set());
   return { nodes, edges };
+}
+
+/** adopt per-instance source state from the PREVIOUS compile's nodes
+    wherever a compiled id survives with the same attachments — so a
+    structural edit's recompile no longer restarts every module's
+    modulation (an LFO keeps its phase, a filter its memory, the display
+    its lastSample). Root nodes pass through compile by reference and
+    skip out on identity; a departed or re-attached slot keeps its fresh
+    clone. Callers that MEAN a fresh start (New / paste / a session
+    join's rebuild) simply don't call this. */
+export function adoptSources(prev: PatchNode[], next: PatchNode[]): void {
+  const byId = new Map(prev.map(n => [n.id, n]));
+  for (const n of next) {
+    const p = byId.get(n.id);
+    if (p && p !== n && p.data.slots !== n.data.slots) adoptTreeState(p.data.slots, n.data.slots);
+  }
 }
 
 function expand(

@@ -15,7 +15,7 @@
    in slot PATHS and in whole-tree snap overlays. */
 
 import {
-  attachFrom, cloneSlot, detach, fromJSON, getSource, setDepth, setDial, setMode, toJSON,
+  adoptBody, attachFrom, cloneSlot, detach, fromJSON, getSource, setDepth, setDial, setMode, toJSON,
   type Dials, type DialsSnap, type Slot, type SlotSnap,
 } from '@ldlework/dials';
 import { slotFor, type ParamDef } from './params';
@@ -64,6 +64,33 @@ export function cloneTree(slots: Dials): Dials {
   const out: Dials = {};
   for (const k in slots) out[k] = cloneSlot(slots[k] as Slot<unknown>);
   return out;
+}
+
+/** adopt sampler continuity from the RETIRING clone of the same logical
+    slot tree onto its freshly compiled successor: each surviving
+    attachment's stateful body (an LFO's phase, a filter's memory — dials'
+    adoptBody), plus lastSample / _lerpY so the display and lerp easing
+    don't blink between the recompile and the next engine tick. Values
+    stay the successor's own (the freshly merged canon); a slot whose
+    attachment CHANGED keeps its fresh source — that restart is the edit's
+    meaning. Recurses through matching source params. */
+export function adoptTreeState(prev: Dials, next: Dials): void {
+  for (const k in next) {
+    const p = prev[k] as Slot<unknown> | undefined;
+    if (p) adoptSlotState(p, next[k] as Slot<unknown>);
+  }
+}
+
+function adoptSlotState(prev: Slot<unknown>, next: Slot<unknown>): void {
+  if (prev === next) return;                     // aliased (a root node) — nothing diverged
+  if (next.lastSample === undefined) next.lastSample = prev.lastSample;
+  if (next._lerpY === undefined) next._lerpY = prev._lerpY;
+  if (!prev.attached || !next.attached || prev.attached.def !== next.attached.def) return;
+  adoptBody(prev.attached, next.attached);
+  for (const k in next.attached.params) {
+    const pp = prev.attached.params[k] as Slot<unknown> | undefined;
+    if (pp) adoptSlotState(pp, next.attached.params[k] as Slot<unknown>);
+  }
 }
 
 /** apply a value/slot op's mutation to a live slot tree by path — the

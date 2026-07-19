@@ -76,7 +76,7 @@ export { read, sampleSlot, sampleSource } from './sample'
 export { toJSON, fromJSON } from './json'
 export type { SlotSnap, SourceSnap, DialsSnap } from './json'
 
-export { cloneSlot, cloneDials } from './clone'
+export { cloneSlot, cloneDials, adoptBody } from './clone'
 
 export { loadDials, saveDials } from './network'
 export type { DialsEndpoint } from './network'

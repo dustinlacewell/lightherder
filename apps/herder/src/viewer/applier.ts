@@ -19,7 +19,7 @@
    the rings (the host pressed New). */
 
 import {
-  applyOp, applySlotOp, compile, instancePrefixes, isSlotValueOp, isValueOp, sweepEntryVals,
+  adoptSources, applyOp, applySlotOp, compile, instancePrefixes, isSlotValueOp, isValueOp, sweepEntryVals,
   type NodeData, type Op, type OpScope, type SubPatch,
 } from '../patch';
 import { setDial, type Slot } from '@ldlework/dials';
@@ -40,21 +40,28 @@ export function viewerRoot(): SubPatch {
 /* recompile the tree into the mirror BY REFERENCE — the engine reads
    mirror.nodes/edges every tick, so swapping the arrays in place is what
    makes a structural edit visible without a rebuild. compiled ids are
-   stable for surviving nodes, so rings stay warm. */
+   stable for surviving nodes, so rings stay warm — and each surviving
+   instance's source state (LFO phase, filter memory, lastSample) is
+   adopted across the re-clone, so a structural op doesn't skip every
+   module's modulation. */
 function recompile(): void {
   const flat = compile(root, libStore.resolve);
+  adoptSources(mirror.nodes, flat.nodes);
   mirror.nodes = flat.nodes;
   mirror.edges = flat.edges;
 }
 
 /** the session's `deps.rebuild`: release every current node, swap the
-    root, recompile. The join snapshot's live-swap and replaceGraph both
-    ride this — rings legitimately die (a fresh graph replaces the old),
-    exactly the bench's rebuild semantics minus React Flow. */
+    root, compile FRESH — no state adoption; rings and source state
+    legitimately die (a new graph replaces the old). The join snapshot's
+    live-swap and replaceGraph both ride this, exactly the bench's
+    rebuild semantics minus React Flow. */
 export function viewerRebuild(next: SubPatch): void {
   for (const n of mirror.nodes) releaseNode(n.id);
   root = next;
-  recompile();
+  const flat = compile(root, libStore.resolve);
+  mirror.nodes = flat.nodes;
+  mirror.edges = flat.edges;
 }
 
 /** install the headless applier on the dispatcher. Every remote op rides
