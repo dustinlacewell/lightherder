@@ -45,13 +45,31 @@ interface FoldSignal {
 }
 const FoldAllContext = createContext<FoldSignal>({ target: false, nonce: 0 })
 
+/**
+ * Where the slot's caption sits. `'above'` (default) is the classic
+ * title-over-dial strip. `'below'` suppresses that strip entirely — the
+ * control draws its own caption under itself (a knob engraves the label
+ * + value beneath its face), the compact layout herder's node strips
+ * want. A modulated row's fold toggle then rides beside the control
+ * instead of hanging off the (absent) caption.
+ */
+export type Caption = 'above' | 'below'
+
+/** Build a Row bound to a caption placement (see `Caption`). */
+export function makeRow(caption: Caption): (props: RowProps) => ReactNode {
+  if (caption === 'above') return Row
+  return (props) => <Row {...props} caption="below" />
+}
+
 export function Row({
   label,
   control,
   attach,
   nested,
   description,
-}: RowProps): ReactNode {
+  caption = 'above',
+}: RowProps & { caption?: Caption }): ReactNode {
+  const below = caption === 'below'
   // A nested drawer (an attached source's sub-params) can be folded
   // away to keep deep modulation trees scannable. State is per-row and
   // ephemeral — presentation only, never touches the dials tree. Rows
@@ -89,42 +107,55 @@ export function Row({
     setCollapsed((c) => !c)
   }
 
+  // The fold toggle for a modulated row. In the above layout it hangs
+  // off the caption's left; in the below layout there is no caption, so
+  // it rides in the control area's top-left corner instead.
+  const fold = nested ? (
+    <button
+      type="button"
+      className="pd-row-fold"
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? 'Expand modulation' : 'Collapse modulation'}
+      title="Click to fold · Shift-click to fold all below"
+      onClick={onFold}
+    >
+      {collapsed ? '▸' : '▾'}
+    </button>
+  ) : null
+
   return (
-    <div className="pd-row" data-collapsed={nested && collapsed ? '' : undefined}>
-      <div className="pd-row-caption">
-        <span className="pd-row-label">
-          {nested ? (
-            <button
-              type="button"
-              className="pd-row-fold"
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? 'Expand modulation' : 'Collapse modulation'}
-              title="Click to fold · Shift-click to fold all below"
-              onClick={onFold}
-            >
-              {collapsed ? '▸' : '▾'}
-            </button>
-          ) : null}
-          {/* The title itself is the hover target — no separate (?).
-              Falls back to plain text when the slot has no description. */}
-          {description ? (
-            <HoverCard
-              content={
-                <>
-                  <strong>{label}</strong>
-                  <span>{description}</span>
-                </>
-              }
-            >
-              <span className="pd-row-title">{label}</span>
-            </HoverCard>
-          ) : (
-            <span className="pd-row-title pd-row-title-plain">{label}</span>
-          )}
-        </span>
-      </div>
+    <div
+      className={`pd-row${below ? ' pd-row-below' : ''}`}
+      data-collapsed={nested && collapsed ? '' : undefined}
+    >
+      {/* The caption strip — above layout only. Below layout lets the
+          control (a knob) engrave its own label under its face. */}
+      {!below ? (
+        <div className="pd-row-caption">
+          <span className="pd-row-label">
+            {fold}
+            {/* The title itself is the hover target — no separate (?).
+                Falls back to plain text when the slot has no description. */}
+            {description ? (
+              <HoverCard
+                content={
+                  <>
+                    <strong>{label}</strong>
+                    <span>{description}</span>
+                  </>
+                }
+              >
+                <span className="pd-row-title">{label}</span>
+              </HoverCard>
+            ) : (
+              <span className="pd-row-title pd-row-title-plain">{label}</span>
+            )}
+          </span>
+        </div>
+      ) : null}
       {control ? (
         <div className="pd-row-control">
+          {below ? fold : null}
           {control}
           {attach ? <span className="pd-row-attach">{attach}</span> : null}
         </div>

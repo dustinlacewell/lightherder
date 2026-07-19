@@ -50,9 +50,34 @@ survives (slimmed).
   (uniform slot model; globals unmodulated, read `.dial.value`). Engine is
   sole sampler: one `sampleSlot` pass/tick with `ctx={dt,t}`, `paramValue`
   combines `slot.lastSample` + wire via `meta.hints`.
-- **Phase 3 — herder node-UI cutover (every knob).** Not started. Phase 2
-  leaves the bespoke `Knob` rendering minimally working (reads
-  `slot.dial.value`); Phase 3 replaces it with `SlotRow` strips + SlotChrome.
+- **Phase 3 — herder node-UI cutover. ✅ DONE & GREEN (committed `2afcee1`).**
+  RESCOPED by two owner decisions (2026-07-19): discrete params keep bespoke
+  widgets, and dial/xypad are NODES not params (their knobs stay bespoke,
+  keep the `DIAL_VAL_UNI` re-range). So only the device DRAWER (`Shell.tsx`)
+  became a `SlotRow` strip; `Knob`/`XYPad`/`ArcGauge` all SURVIVE — the
+  design's "delete Knob/ArcGauge" no longer holds. New: `ui/controls/
+  dialsBundle.tsx` (root phosphor bundle @44px + herder SlotChrome; per-node
+  SlotActions→dispatched ops; liveOverride gated on live-presence),
+  `ui/controls/SlotChrome.tsx` (MIDI learn/unbind/mode-flip + MIDI/port dots
+  + ctx menu; registers no MIDI setter — CC uses the model fallback). Drawer
+  watchLive-subscribes exposed params. herder gained `@ldlework/phosphor-dials`
+  + `@ldlework/phosphor` + CSS. All 9 typecheck; herder builds; headless
+  render probe green. **All three phases complete.**
+- **Phase 3 follow-up — caption + typography convergence.** The initial
+  cutover left the SlotRow knobs with phosphor's title-ABOVE caption (big,
+  white, bold) and an over-bold value, out of step with herder's old
+  name-under-value-under convention and the discrete bespoke knobs beside
+  them. Grew a real seam rather than CSS-hacking around it (owner: "make
+  phosphor/dials flexible if needed"): dials `SliderProps.label` (additive);
+  phosphor-dials `makeDialPanelComponents({ caption: 'above' | 'below' })` +
+  `makeRow`/`Caption` — `'below'` suppresses the Row caption strip and the
+  `KnobSlider` forwards the label into the Knob so it engraves its own
+  small/dim label + value under its face (fold toggle relocates into the
+  control corner). phosphor `.chrome-knob-value` weight 600→500. herder uses
+  `caption:'below'` and matches its bespoke `Knob` `.lbl`/`.val` to the
+  phosphor knob sizes so discrete + modulated knobs are indistinguishable in
+  one strip. Zero-config consumers (docs stories) unchanged — default stays
+  `'above'`.
 
 (Phase 2 is the big one; it may want sub-steps — model+ops, then engine, then
 persistence — each separately verifiable. That's sequencing within a phase, not

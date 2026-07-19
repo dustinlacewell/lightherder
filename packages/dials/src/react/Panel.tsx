@@ -396,6 +396,7 @@ function NumberEditor({
         onDepthChange={onDepthChange}
         defaultValue={slot.dial.initial}
         attach={attach}
+        label={slot.dial.meta.label ?? path[path.length - 1]}
       />
       {c.sliderShowsValue ? null : (
         <c.NumberField

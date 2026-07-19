@@ -133,6 +133,6 @@ export function liveOverrideFor(id: string): LiveOverride {
 /** the components every device strip renders through — provided once at
     the bench root (Bench.tsx). Static: no node identity, no ops. */
 export const herderPanelComponents = {
-  ...makeDialPanelComponents({ knobSize: 44 }),
+  ...makeDialPanelComponents({ knobSize: 44, caption: 'below' }),
   SlotChrome,
 };

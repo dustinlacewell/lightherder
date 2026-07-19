@@ -90,6 +90,14 @@ export interface SliderProps {
    * and ignored by sliders that don't relocate it (like DefaultSlider).
    */
   attach?: ReactNode
+  /**
+   * The slot's display label (`meta.label ?? key`), passed so a slider
+   * that draws its own caption (e.g. a knob with the name engraved under
+   * its face) can render it in place — a compact layout where the Row's
+   * own caption strip is suppressed. Optional and ignored by sliders
+   * that leave captioning to the Row (like DefaultSlider).
+   */
+  label?: ReactNode
 }
 
 export interface NumberFieldProps {

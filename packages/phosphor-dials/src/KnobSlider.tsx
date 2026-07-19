@@ -47,19 +47,33 @@ const DEFAULT_KNOB_SIZE = 56
 export interface KnobSliderExtras {
   /** Knob diameter in px (default 56). */
   knobSize?: number
+  /**
+   * Engrave the slot's label under the knob face (the Knob's own
+   * caption), for a compact layout where the Row suppresses its caption
+   * strip. Off by default — captioning stays the Row's job.
+   */
+  showLabel?: boolean
 }
 
 /**
- * A `KnobSlider` variant bound to a fixed knob size, for the panel
- * bundle's `Slider` slot (which the Panel calls with plain `SliderProps`
- * only). Returns the shared `KnobSlider` reference for the default size
- * so the common bundle stays referentially stable.
+ * A `KnobSlider` variant bound to a fixed knob size (and optional
+ * self-caption), for the panel bundle's `Slider` slot (which the Panel
+ * calls with plain `SliderProps` only). Returns the shared `KnobSlider`
+ * reference when neither is set so the common bundle stays referentially
+ * stable.
  */
 export function sizedKnobSlider(
   knobSize?: number,
+  showLabel?: boolean,
 ): (props: SliderProps) => ReactNode {
-  if (knobSize === undefined) return KnobSlider
-  return (props: SliderProps) => <KnobSlider {...props} knobSize={knobSize} />
+  if (knobSize === undefined && !showLabel) return KnobSlider
+  return (props: SliderProps) => (
+    <KnobSlider
+      {...props}
+      {...(knobSize !== undefined ? { knobSize } : {})}
+      showLabel={!!showLabel}
+    />
+  )
 }
 
 export function KnobSlider({
@@ -75,7 +89,9 @@ export function KnobSlider({
   mode,
   defaultValue,
   attach,
+  label,
   knobSize = DEFAULT_KNOB_SIZE,
+  showLabel = false,
 }: SliderProps & KnobSliderExtras): ReactNode {
   const [liveSample, setLiveSample] = useState<number | undefined>(undefined)
   // When the Panel routes the attach control here (sliderHostsAttach),
@@ -121,6 +137,7 @@ export function KnobSlider({
       onRightClick={hostedAttach ? () => setPickerOpen(true) : undefined}
       scale={scale ?? 'linear'}
       size={knobSize}
+      {...(showLabel && typeof label === 'string' ? { label } : {})}
       onChangeBaseline={onChange}
       defaultValue={defaultValue}
       tab={

@@ -123,7 +123,7 @@
 /* Value readout: small lit digits under the label. */
 .chrome-knob-value {
   font-size: 0.66rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;

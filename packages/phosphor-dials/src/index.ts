@@ -25,13 +25,13 @@ import { type PanelComponents } from '@ldlework/dials/react'
 
 import { sizedKnobSlider } from './KnobSlider'
 import { LerpControl } from './LerpControl'
-import { Row } from './Row'
+import { Row, makeRow, type Caption } from './Row'
 import { Heading } from './Heading'
 import { AttachControl } from './AttachControl'
 
 export { KnobSlider } from './KnobSlider'
 export { LerpControl } from './LerpControl'
-export { Row } from './Row'
+export { Row, makeRow, type Caption } from './Row'
 export { Heading } from './Heading'
 export { AttachControl } from './AttachControl'
 export { SourcePreview } from './SourcePreview'
@@ -59,6 +59,13 @@ export const GLYPH_IN_DIAL = true
 export interface DialPanelOptions {
   /** Knob face diameter in px (default 56). */
   knobSize?: number
+  /**
+   * Where each slot's caption sits. `'above'` (default) is the classic
+   * title-over-dial strip. `'below'` suppresses that strip and lets the
+   * knob engrave its own label + value beneath its face — the compact
+   * layout a dense node UI wants. See `Caption`.
+   */
+  caption?: Caption
 }
 
 /**
@@ -69,12 +76,13 @@ export interface DialPanelOptions {
 export function makeDialPanelComponents(
   opts: DialPanelOptions = {},
 ): PanelComponents {
+  const below = opts.caption === 'below'
   return {
-    Slider: sizedKnobSlider(opts.knobSize),
+    Slider: sizedKnobSlider(opts.knobSize, below),
     NumberField,
     Dropdown,
     HelpTooltip,
-    Row,
+    Row: below ? makeRow('below') : Row,
     Heading,
     LerpControl,
     // Icon-based source picker: glyph trigger + popover glyph grid,
