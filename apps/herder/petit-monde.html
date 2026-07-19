@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Petit Monde — a video-feedback instrument</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PETIT MONDE — a video-feedback instrument
+   after Dave Blair's Light Herder
+
+   The palette is the machine's: void black (a monitor, off),
+   shellac amber, mahogany ember, maple cream. The type pairs
+   Fraunces (the shellacked wood) with IBM Plex Mono (the
+   broadcast field-monitor hardware).
+   ============================================================ */
+:root{
+  --void:      #060505;
+  --panel:     rgba(19, 14, 9, 0.86);
+  --panel-hi:  rgba(34, 25, 16, 0.9);
+  --edge:      #2b2013;
+  --edge-hi:   #52381d;
+  --maple:     #ecdfc4;
+  --dim:       #9b8767;
+  --faint:     #5d4f3b;
+  --amber:     #d99b4a;
+  --ember:     #c25f33;
+  --mahog:     #7a3b28;
+  --alive:     #d99b4a;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --disp: "Fraunces", Georgia, "Times New Roman", serif;
+}
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; overflow:hidden; }
+body{
+  background: var(--void);
+  color: var(--maple);
+  font-family: var(--mono);
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+canvas#glass{
+  position:fixed; inset:0; width:100%; height:100%;
+  display:block; cursor:crosshair; touch-action:none;
+}
+
+/* ---- title, quiet in the corner -------------------------- */
+#masthead{
+  position:fixed; top:18px; left:22px; z-index:5;
+  pointer-events:none;
+  transition: opacity .5s ease;
+}
+#masthead h1{
+  font-family: var(--disp);
+  font-weight: 300;
+  font-style: italic;
+  font-size: 21px;
+  letter-spacing: .04em;
+  color: var(--maple);
+  text-shadow: 0 1px 12px rgba(0,0,0,.8);
+}
+#masthead p{
+  margin-top: 3px;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-shadow: 0 1px 8px rgba(0,0,0,.8);
+}
+
+/* ---- hide-interface toggle -------------------------------- */
+#veil{
+  position:fixed; top:16px; right:16px; z-index:9;
+  width:34px; height:34px; border-radius:50%;
+  background: var(--panel); border:1px solid var(--edge);
+  color: var(--dim); font-family:var(--mono); font-size:13px;
+  cursor:pointer; transition: color .2s, border-color .2s, opacity .5s;
+}
+#veil:hover{ color:var(--amber); border-color:var(--amber); }
+body.veiled #masthead,
+body.veiled #deck,
+body.veiled #meterWrap,
+body.veiled #toast{ opacity:0; pointer-events:none; }
+body.veiled #veil{ opacity:.25; }
+
+/* ---- the control deck ------------------------------------- */
+#deck{
+  position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+  z-index:5; max-width: calc(100vw - 88px);
+  background: var(--panel);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border:1px solid var(--edge);
+  border-top:1px solid #52381d;
+  border-radius:10px;
+  padding:12px 16px 12px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55);
+  transition: opacity .5s ease;
+}
+#groups{
+  display:flex; gap:22px; align-items:flex-start;
+  overflow-x:auto; padding-bottom:2px;
+  scrollbar-width:thin; scrollbar-color: var(--faint) transparent;
+}
+.group{ flex:0 0 auto; }
+.group > h2{
+  font-size:9px; font-weight:500; letter-spacing:.22em;
+  color:var(--dim); text-transform:uppercase;
+  padding-bottom:6px; margin-bottom:8px;
+  border-bottom:1px solid var(--edge);
+}
+.group > h2 em{ font-style:normal; color:var(--faint); letter-spacing:.08em; margin-left:6px; }
+.knobs{ display:flex; gap:14px; }
+
+/* ---- knobs ------------------------------------------------- */
+.knob{
+  width:58px; display:flex; flex-direction:column; align-items:center; gap:2px;
+  cursor:ns-resize; outline:none; border-radius:8px;
+}
+.knob:focus-visible{ box-shadow:0 0 0 2px var(--amber); }
+.knob svg{ display:block; }
+.knob .lbl{
+  font-size:9px; letter-spacing:.06em; color:var(--dim);
+  white-space:nowrap; text-align:center;
+}
+.knob .val{
+  font-size:9px; color:var(--maple); opacity:.85;
+  font-variant-numeric: tabular-nums; white-space:nowrap;
+}
+.knob:hover .lbl, .knob:focus-visible .lbl{ color:var(--amber); }
+body.herding .knob .arc-val{ filter: drop-shadow(0 0 3px rgba(217,155,74,.7)); }
+
+/* ---- transport + presets ----------------------------------- */
+#transport{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-top:10px; padding-top:10px;
+  border-top:1px solid var(--edge);
+}
+button.key{
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  color:var(--maple); background:var(--panel-hi);
+  border:1px solid var(--edge); border-radius:6px;
+  padding:6px 11px; cursor:pointer;
+  transition: border-color .15s, color .15s, background .15s, box-shadow .3s;
+}
+button.key:hover{ border-color:var(--amber); color:var(--amber); }
+button.key:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--amber); }
+button.key.lit{
+  color:#120c06; background:var(--amber); border-color:var(--amber);
+}
+button.key.pulse{ animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(217,155,74,0); }
+  50%    { box-shadow:0 0 14px 2px rgba(217,155,74,.55); border-color:var(--amber); }
+}
+#presets{ display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
+button.chip{
+  font-family:var(--disp); font-style:italic; font-size:12px;
+  color:var(--dim); background:transparent;
+  border:1px solid transparent; border-radius:999px;
+  padding:4px 10px; cursor:pointer; transition: color .15s, border-color .15s;
+}
+button.chip:hover{ color:var(--amber); }
+button.chip.on{ color:var(--maple); border-color:var(--edge); }
+button.chip:focus-visible{ outline:none; border-color:var(--amber); }
+
+/* ---- the middlespace meter --------------------------------- */
+#meterWrap{
+  position:fixed; right:20px; bottom:14px; z-index:5;
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+  transition: opacity .5s ease;
+}
+#meterWrap .cap{
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size:8px; letter-spacing:.28em; color:var(--faint); text-transform:uppercase;
+}
+#meter{
+  position:relative; width:10px; height:150px;
+  border-radius:6px; border:1px solid var(--edge);
+  background: linear-gradient(to top, #000 0%, #fff 100%);
+  overflow:hidden;
+}
+#meterBand{
+  position:absolute; left:0; right:0;
+  background: rgba(217,155,74,.28);
+  border-top:1px solid rgba(217,155,74,.7);
+  border-bottom:1px solid rgba(217,155,74,.7);
+}
+#meterMark{
+  position:absolute; left:-2px; right:-2px; height:2px;
+  background: var(--ember);
+  box-shadow: 0 0 6px 1px rgba(194,95,51,.9);
+  transition: bottom .25s linear;
+}
+
+/* ---- toast -------------------------------------------------- */
+#toast{
+  position:fixed; left:50%; bottom:0; transform:translateX(-50%) translateY(0);
+  z-index:6; pointer-events:none;
+  font-size:10px; letter-spacing:.08em; color:var(--dim);
+  background:var(--panel); border:1px solid var(--edge); border-radius:6px;
+  padding:6px 12px; opacity:0; transition: opacity .5s, transform .5s;
+}
+#toast.show{ opacity:1; }
+
+/* ---- the beginning ------------------------------------------ */
+#genesis{
+  position:fixed; inset:0; z-index:20;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:0; background: var(--void);
+  transition: opacity 1.4s ease; text-align:center; padding:24px;
+}
+#genesis.gone{ opacity:0; pointer-events:none; }
+#ember{
+  width:5px; height:5px; border-radius:50%;
+  background: var(--ember);
+  box-shadow: 0 0 18px 4px rgba(194,95,51,.6);
+  margin-bottom:38px;
+  animation: breathe 3.4s ease-in-out infinite;
+}
+@keyframes breathe{
+  0%,100%{ opacity:.35; transform:scale(.8);}
+  50%    { opacity:1;   transform:scale(1.25);}
+}
+#genesis h1{
+  font-family:var(--disp); font-weight:300; font-style:italic;
+  font-size: clamp(34px, 7vw, 58px); letter-spacing:.02em; color:var(--maple);
+}
+#genesis .sub{
+  margin-top:10px; font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--dim);
+}
+#genesis .creed{
+  margin-top:30px; max-width:430px; line-height:1.8;
+  font-family:var(--disp); font-size:14.5px; font-weight:300; color:var(--dim);
+}
+#genesis .creed b{ font-weight:400; color:var(--amber); font-style:italic; }
+#fiat{
+  margin-top:40px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--amber); background:transparent;
+  border:1px solid var(--mahog); border-radius:999px;
+  padding:13px 30px; cursor:pointer;
+  transition: background .25s, color .25s, box-shadow .25s, border-color .25s;
+}
+#fiat:hover, #fiat:focus-visible{
+  outline:none; background:var(--amber); color:#120c06; border-color:var(--amber);
+  box-shadow: 0 0 34px 4px rgba(217,155,74,.35);
+}
+#genesis .hint{
+  margin-top:26px; font-size:9.5px; letter-spacing:.1em; color:var(--faint);
+}
+#genesis .err{
+  margin-top:22px; font-size:11px; color:var(--ember); display:none; max-width:420px; line-height:1.6;
+}
+
+@media (max-width: 760px){
+  #deck{ max-width: calc(100vw - 20px); left:10px; right:10px; transform:none; padding:10px 12px; }
+  #meterWrap{ display:none; }
+  #masthead h1{ font-size:17px; }
+  .knobs{ gap:10px; }
+  .knob{ width:52px; }
+}
+@media (prefers-reduced-motion: reduce){
+  #ember{ animation:none; opacity:.8; }
+  button.key.pulse{ animation:none; border-color:var(--amber); }
+}
+</style>
+</head>
+<body>
+
+<canvas id="glass"></canvas>
+
+<header id="masthead">
+  <h1>Petit Monde</h1>
+  <p>after Dave Blair’s Light Herder</p>
+</header>
+
+<button id="veil" title="Hide the interface (H)" aria-label="Hide the interface">◐</button>
+
+<div id="meterWrap" aria-hidden="true">
+  <div id="meter">
+    <div id="meterBand"></div>
+    <div id="meterMark"></div>
+  </div>
+  <span class="cap">middlespace</span>
+</div>
+
+<div id="toast" role="status"></div>
+
+<nav id="deck" aria-label="Instrument controls">
+  <div id="groups"></div>
+  <div id="transport">
+    <button class="key" id="btnSpark" title="Inject light (space, or tap the screen)">✳ Spark</button>
+    <button class="key" id="btnHerd"  title="Auto-pilot: ride the brightness (D)">Herd</button>
+    <button class="key" id="btnFreeze" title="Hold the image still (F)">Freeze</button>
+    <button class="key" id="btnClear" title="Return to the void (C)">Clear</button>
+    <button class="key" id="btnKeep"  title="Save this frame as a PNG">Keep frame</button>
+    <div id="presets" role="group" aria-label="Presets"></div>
+  </div>
+</nav>
+
+<div id="genesis">
+  <div id="ember" aria-hidden="true"></div>
+  <h1>Petit Monde</h1>
+  <div class="sub">a video-feedback instrument · after Dave Blair’s Light Herder</div>
+  <p class="creed">
+    Two feedback loops watch themselves and each other through a pane of
+    virtual glass. Every image here exists only while it loops — herd it
+    along the edge between black and white, the <b>middlespace</b>,
+    and keep it alive.
+  </p>
+  <button id="fiat">Let there be light</button>
+  <p class="hint">drag to move the camera · tap to spark · space / F / D / C / H</p>
+  <p class="err" id="glErr"></p>
+</div>
+
+<script>
+'use strict';
+/* ================================================================
+   PETIT MONDE — engine
+   ----------------------------------------------------------------
+   The physical machine, translated:
+
+     camera on rods ......... an affine transform of texture UVs
+     teleprompter glass ..... a kaleidoscopic fold + a display mix
+     two monitor towers ..... two ping-pong framebuffer pairs, A & B,
+                              each fed a measure of the other (coupling)
+     the analog knobs ....... nonlinear transfer functions per frame
+     the operator ........... you (or the Herd auto-pilot, a small
+                              servo that rides the brightness)
+
+   Each frame:  A′ = herd(A, B)     B′ = herd(B, A)
+   Display:     glass · A′  +  (1 − glass) · B′   … plus vignette & grain.
+
+   The image lives in the loop. Open the loop and it is gone.
+   ================================================================ */
+
+/* ---------- 1 · The parameters (the knobs) ---------------------- */
+const deg = r => (r * 180 / Math.PI);
+const PARAMS = {
+  /* OPTICS — the camera on its rods */
+  rotate:  { g:'optics', label:'Rotate',     min:-0.25,  max:0.25,  def: 0.035, fmt:v=>deg(v).toFixed(1)+'°/f' },
+  zoom:    { g:'optics', label:'Zoom',       min: 0.90,  max:1.10,  def: 1.014, fmt:v=>'×'+v.toFixed(3) },
+  kaleido: { g:'optics', label:'Mirrors',    min: 0,     max:12,    def: 0, step:1, fmt:v=>v<2?'off':v+'-fold' },
+  /* SIGNAL — the analog knobs of the field monitor */
+  bright:  { g:'signal', label:'Brightness', min:-0.20,  max:0.20,  def: 0.011, fmt:v=>(v>=0?'+':'')+v.toFixed(3) },
+  contrast:{ g:'signal', label:'Contrast',   min: 0.80,  max:1.35,  def: 1.020, fmt:v=>v.toFixed(3) },
+  sat:     { g:'signal', label:'Saturation', min: 0,     max:2,     def: 1.18,  fmt:v=>v.toFixed(2) },
+  hue:     { g:'signal', label:'Hue drift',  min:-0.15,  max:0.15,  def: 0.020, fmt:v=>deg(v).toFixed(1)+'°/f' },
+  /* LOOP — the feedback itself */
+  feedback:{ g:'loop',   label:'Feedback',   min: 0.85,  max:1.00,  def: 0.984, fmt:v=>v.toFixed(3) },
+  blur:    { g:'loop',   label:'Diffusion',  min: 0,     max:2.5,   def: 0.65,  fmt:v=>v.toFixed(2)+'px' },
+  noise:   { g:'loop',   label:'Grain',      min: 0,     max:0.06,  def: 0.006, fmt:v=>v.toFixed(3) },
+  chroma:  { g:'loop',   label:'Chroma',     min: 0,     max:0.012, def: 0.0015,fmt:v=>(v*1000).toFixed(1)+'‰' },
+  /* GLASS — how the two loops see each other */
+  coupling:{ g:'glass',  label:'Coupling',   min: 0,     max:0.60,  def: 0.12,  fmt:v=>(v*100).toFixed(0)+'%' },
+  diverge: { g:'glass',  label:'Divergence', min: 0,     max:1,     def: 0.50,  fmt:v=>(v*100).toFixed(0)+'%' },
+  glass:   { g:'glass',  label:'Glass mix',  min: 0,     max:1,     def: 0.38,  fmt:v=>'A '+((1-v)*100|0)+' · '+(v*100|0)+' B' },
+};
+const GROUPS = [
+  { id:'optics', name:'Optics',  note:'the camera' },
+  { id:'signal', name:'Signal',  note:'the knobs'  },
+  { id:'loop',   name:'Loop',    note:'the feedback' },
+  { id:'glass',  name:'Glass',   note:'the coupling' },
+];
+const PRESETS = {
+  'First Light':   {},
+  'Jellyfish':     { rotate:0.021, zoom:1.030, kaleido:6, bright:0.005, contrast:1.055, sat:1.45, hue:0.036,
+                     feedback:0.976, blur:1.20, noise:0.004, chroma:0.0022, coupling:0.18, diverge:0.65, glass:0.42 },
+  'Nebula':        { rotate:0.008, zoom:1.020, kaleido:0, bright:0.007, contrast:0.972, sat:0.92, hue:0.012,
+                     feedback:0.995, blur:2.05, noise:0.013, chroma:0.0040, coupling:0.30, diverge:0.30, glass:0.50 },
+  'Romanesco':     { rotate:0.060, zoom:0.956, kaleido:8, bright:0.013, contrast:1.150, sat:1.20, hue:-0.020,
+                     feedback:0.968, blur:0.32, noise:0.003, chroma:0.0008, coupling:0.08, diverge:0.80, glass:0.25 },
+  'Rippling Pool': { rotate:0.004, zoom:1.007, kaleido:0, bright:0.003, contrast:1.230, sat:0.34, hue:0.004,
+                     feedback:0.990, blur:0.95, noise:0.021, chroma:0.0010, coupling:0.22, diverge:0.20, glass:0.50 },
+};
+
+/* ---------- 2 · State ------------------------------------------- */
+const S = {
+  v: Object.fromEntries(Object.entries(PARAMS).map(([k,p]) => [k, p.def])),
+  offset: { x:0, y:0 },            // where you've slid the camera
+  spark:  { x:.5, y:.5, t:-9, hue:0, power:1 },
+  frozen: false,
+  herding:false,
+  frame:  0,
+  lum:    0,                        // measured mean luminance
+  lumSm:  0.2,                      // smoothed, for the servo
+  servo:  0,                        // Herd's brightness correction
+  began:  false,
+  keep:   false,                    // save-frame request
+};
+const MIDDLE = { lo: 0.045, hi: 0.60, target: 0.22 };   // the alive zone
+
+/* ---------- 3 · WebGL boot -------------------------------------- */
+const canvas = document.getElementById('glass');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false,
+                                         preserveDrawingBuffer:false });
+function fail(msg){
+  const e = document.getElementById('glErr');
+  e.textContent = msg; e.style.display = 'block';
+  document.getElementById('fiat').style.display = 'none';
+}
+if (!gl) fail('This device offered no WebGL2 context — the glass stays dark here. Try a recent browser with hardware acceleration on.');
+
+const hasFloat = gl && !!gl.getExtension('EXT_color_buffer_float');
+const IFMT = hasFloat ? gl?.RGBA16F : gl?.RGBA8;
+const TYPE = hasFloat ? gl?.HALF_FLOAT : gl?.UNSIGNED_BYTE;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function program(vs, fs){
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+    throw new Error(gl.getProgramInfoLog(p));
+  const U = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i=0; i<n; i++){
+    const info = gl.getActiveUniform(p, i);
+    U[info.name] = gl.getUniformLocation(p, info.name);
+  }
+  return { p, U };
+}
+
+/* one full-screen triangle — the simplest possible stage */
+const VERT = `#version 300 es
+out vec2 vUv;
+void main(){
+  vec2 v = vec2((gl_VertexID<<1)&2, gl_VertexID&2);
+  vUv = v;
+  gl_Position = vec4(v*2.0-1.0, 0.0, 1.0);
+}`;
+
+/* ---------- 4 · The feedback shader (one loop's frame) ----------- */
+const HERD_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 frag;
+
+uniform sampler2D uSelf;    /* this loop, one frame ago  */
+uniform sampler2D uOther;   /* the other loop, coupled in */
+uniform vec2  uRes;
+uniform float uTime;
+
+/* optics — the camera on its rods */
+uniform float uRotate, uZoom, uKaleido;
+uniform vec2  uOffset;
+/* signal — the analog knobs */
+uniform float uBright, uContrast, uSat, uHue;
+/* loop */
+uniform float uFeedback, uBlur, uNoise, uChroma;
+/* glass */
+uniform float uCoupling;
+/* a hand held to the lens */
+uniform vec4  uSpark;       /* xy pos (uv) · z intensity · w hue */
+
+float hash(vec2 p){
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+vec3 hueRotate(vec3 c, float a){
+  const vec3 k = vec3(0.57735);
+  float ca = cos(a);
+  return c*ca + cross(k, c)*sin(a) + k*dot(k, c)*(1.0 - ca);
+}
+/* centered, aspect-true space — where the camera lives */
+vec2 toLens(vec2 uv){ vec2 p = uv - 0.5; p.x *= uRes.x/uRes.y; return p; }
+vec2 fromLens(vec2 p){ p.x /= uRes.x/uRes.y; return p + 0.5; }
+
+/* the monitor has an edge; the camera sees black beyond it */
+float inFrame(vec2 uv){
+  vec2 s = smoothstep(vec2(0.0), vec2(0.004), uv)
+         * (vec2(1.0) - smoothstep(vec2(0.996), vec2(1.0), uv));
+  return s.x * s.y;
+}
+vec3 blurTap(sampler2D t, vec2 uv){
+  vec2 px = uBlur / uRes;
+  vec3 c = texture(t, uv).rgb * 0.40;
+  c += texture(t, uv + vec2( px.x,  px.y)).rgb * 0.15;
+  c += texture(t, uv + vec2(-px.x,  px.y)).rgb * 0.15;
+  c += texture(t, uv + vec2( px.x, -px.y)).rgb * 0.15;
+  c += texture(t, uv + vec2(-px.x, -px.y)).rgb * 0.15;
+  return c;
+}
+
+void main(){
+  vec2 p = toLens(vUv);
+
+  /* mirrors — fold the world n ways, like glass between monitors */
+  if (uKaleido >= 2.0){
+    float n = floor(uKaleido + 0.5);
+    float sector = 6.28318530718 / n;
+    float a = atan(p.y, p.x);
+    a = mod(a, sector);
+    a = abs(a - sector * 0.5);
+    p = vec2(cos(a), sin(a)) * length(p);
+  }
+
+  /* the camera: rotate on its shaft, slide on its rails, zoom */
+  float ca = cos(uRotate), sa = sin(uRotate);
+  p = mat2(ca, -sa, sa, ca) * p;
+  p /= uZoom;
+  p -= uOffset;
+
+  vec2 suv  = fromLens(p);
+  float m   = inFrame(suv);
+
+  vec3 self = blurTap(uSelf, suv) * m;
+
+  /* chromatic slip — a lens is never honest */
+  if (uChroma > 0.0){
+    vec2 c0 = suv - 0.5;
+    self.r = mix(self.r, texture(uSelf, 0.5 + c0*(1.0 + uChroma*4.0)).r * m, 0.7);
+    self.b = mix(self.b, texture(uSelf, 0.5 + c0*(1.0 - uChroma*4.0)).b * m, 0.7);
+  }
+
+  /* what the other tower is showing, seen through the same lens */
+  vec3 other = texture(uOther, suv).rgb * m;
+  vec3 col   = mix(self, other, uCoupling);
+
+  /* the analog knobs — the nonlinearities that keep this alive */
+  col *= uFeedback;
+  col += uBright;
+  col  = (col - 0.5) * uContrast + 0.5;
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col  = mix(vec3(luma), col, uSat);
+  col  = hueRotate(col, uHue);
+
+  /* sensor grain — the imperfection the loop needs to stay strange */
+  float n = hash(vUv * uRes + fract(uTime) * vec2(157.0, 113.0));
+  col += (n - 0.5) * (uNoise + 0.004);
+
+  /* a spark held to the lens */
+  if (uSpark.z > 0.001){
+    vec2 sp = toLens(uSpark.xy);
+    float d = length(toLens(vUv) - sp);
+    float glow = exp(-d*d*140.0) * uSpark.z;
+    col += hueRotate(vec3(1.0, 0.55, 0.22), uSpark.w) * glow;
+  }
+
+  frag = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+
+/* ---------- 5 · The glass (compositor) --------------------------- */
+const GLASS_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 frag;
+uniform sampler2D uA, uB;
+uniform float uGlass, uTime;
+uniform vec2 uRes;
+float hash(vec2 p){
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+void main(){
+  vec3 col = mix(texture(uA, vUv).rgb, texture(uB, vUv).rgb, uGlass);
+  vec2 p = vUv - 0.5;
+  col *= 1.0 - dot(p, p) * 0.55;              /* vignette — the bezel */
+  col  = pow(col, vec3(0.92));                /* a gentle phosphor lift */
+  col += (hash(vUv*uRes + fract(uTime)*vec2(91.0,53.0)) - 0.5) * 0.012;
+  frag = vec4(col, 1.0);
+}`;
+
+let herd, glassP, vao;
+let loops;      /* loops.A = [texPrev, texNext], loops.B = ... */
+let fbo;
+
+function makeTex(w, h){
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, IFMT, w, h, 0, gl.RGBA, TYPE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+let W = 4, H = 4;
+function buildBuffers(){
+  const scale = Math.min(window.devicePixelRatio || 1, 2) * 0.75;
+  W = Math.max(4, Math.round(canvas.clientWidth  * scale));
+  H = Math.max(4, Math.round(canvas.clientHeight * scale));
+  canvas.width = W; canvas.height = H;
+  if (loops) for (const k of ['A','B']) loops[k].forEach(t => gl.deleteTexture(t));
+  loops = { A:[makeTex(W,H), makeTex(W,H)], B:[makeTex(W,H), makeTex(W,H)] };
+  /* start every texture at true void */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  for (const k of ['A','B']) for (const t of loops[k]){
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    gl.viewport(0,0,W,H); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function bootGL(){
+  herd   = program(VERT, HERD_FRAG);
+  glassP = program(VERT, GLASS_FRAG);
+  vao = gl.createVertexArray();
+  fbo = gl.createFramebuffer();
+  buildBuffers();
+}
+try { if (gl) bootGL(); }
+catch (err){ fail('The shaders would not compile on this GPU: ' + err.message); }
+
+/* ---------- 6 · Loop B, derived --------------------------------
+   Divergence slides tower B from an identical twin (0) toward a
+   mirror-world of tower A (1): counter-rotating, inverse zoom,
+   opposite hue drift, opposite slide. Two loops arguing politely. */
+const lerp = (a,b,t) => a + (b-a)*t;
+function loopUniforms(which, v, ox, oy){
+  if (which === 'A') return { rot:v.rotate, zoom:v.zoom, hue:v.hue, ox, oy };
+  const d = v.diverge;
+  return {
+    rot:  lerp(v.rotate, -v.rotate * 1.35, d),
+    zoom: lerp(v.zoom,   1 / v.zoom,       d),
+    hue:  lerp(v.hue,   -v.hue,            d),
+    ox:   lerp(ox, -ox, d),
+    oy:   lerp(oy, -oy, d),
+  };
+}
+
+/* ---------- 7 · Render ------------------------------------------ */
+function stepLoop(which, other, v, now, mods){
+  const [prev, next] = loops[which];
+  const L = loopUniforms(which, v, S.offset.x + mods.ox, S.offset.y + mods.oy);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, next, 0);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(herd.p);
+
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, prev);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loops[other][0]);
+  gl.uniform1i(herd.U.uSelf, 0);
+  gl.uniform1i(herd.U.uOther, 1);
+  gl.uniform2f(herd.U.uRes, W, H);
+  gl.uniform1f(herd.U.uTime, now * 0.001);
+  gl.uniform1f(herd.U.uRotate,  L.rot  + mods.rotate);
+  gl.uniform1f(herd.U.uZoom,    Math.max(0.5, L.zoom + mods.zoom));
+  gl.uniform1f(herd.U.uKaleido, Math.round(v.kaleido));
+  gl.uniform2f(herd.U.uOffset,  L.ox, L.oy);
+  gl.uniform1f(herd.U.uBright,  v.bright + mods.bright + S.servo);
+  gl.uniform1f(herd.U.uContrast,v.contrast);
+  gl.uniform1f(herd.U.uSat,     v.sat);
+  gl.uniform1f(herd.U.uHue,     L.hue + mods.hue);
+  gl.uniform1f(herd.U.uFeedback,v.feedback);
+  gl.uniform1f(herd.U.uBlur,    v.blur);
+  gl.uniform1f(herd.U.uNoise,   v.noise);
+  gl.uniform1f(herd.U.uChroma,  v.chroma);
+  gl.uniform1f(herd.U.uCoupling,v.coupling);
+
+  const age = (now - S.spark.t) * 0.001;
+  const power = age >= 0 && age < 3 ? Math.exp(-age * 5.5) * S.spark.power : 0;
+  gl.uniform4f(herd.U.uSpark, S.spark.x, S.spark.y,
+               power * (which === 'A' ? 1 : 0.6), S.spark.hue);
+
+  gl.bindVertexArray(vao);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  loops[which] = [next, prev];   /* ping ⇄ pong */
+}
+
+function composite(now){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(glassP.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, loops.A[0]);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loops.B[0]);
+  gl.uniform1i(glassP.U.uA, 0);
+  gl.uniform1i(glassP.U.uB, 1);
+  gl.uniform1f(glassP.U.uGlass, S.v.glass);
+  gl.uniform1f(glassP.U.uTime, now * 0.001);
+  gl.uniform2f(glassP.U.uRes, W, H);
+  gl.bindVertexArray(vao);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* the Herd auto-pilot: gentle LFOs plus a brightness servo.
+   It does exactly what Blair does by hand — it rides the brightness. */
+function herdMods(now){
+  const z = { rotate:0, zoom:0, hue:0, bright:0, ox:0, oy:0 };
+  if (!S.herding) return z;
+  const t = now * 0.001;
+  z.rotate = Math.sin(t*0.11)        * 0.010;
+  z.zoom   = Math.sin(t*0.071 + 1.7) * 0.006;
+  z.hue    = Math.sin(t*0.053 + 0.5) * 0.010;
+  z.bright = Math.sin(t*0.190)       * 0.004;
+  z.ox     = Math.sin(t*0.083)       * 0.035;
+  z.oy     = Math.cos(t*0.067)       * 0.035;
+  return z;
+}
+
+/* measure the mean luminance every so often — the middlespace meter */
+const px = new Uint8Array(16 * 16 * 4);
+function measure(){
+  if (W < 16 || H < 16) return;
+  gl.readPixels((W>>1)-8, (H>>1)-8, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4)
+    sum += 0.2126*px[i] + 0.7152*px[i+1] + 0.0722*px[i+2];
+  S.lum = sum / (256 * 255);
+  S.lumSm += (S.lum - S.lumSm) * 0.25;
+  /* the servo only steers while herding, and only gently */
+  if (S.herding && !S.frozen){
+    const err = MIDDLE.target - S.lumSm;
+    S.servo = Math.max(-0.03, Math.min(0.03, S.servo + err * 0.004));
+  } else {
+    S.servo *= 0.9;
+  }
+  meterMark.style.bottom = (Math.min(1, S.lum) * 100).toFixed(1) + '%';
+  watchTheEdge();
+}
+
+/* nudge the operator when the image nears death */
+let deadSince = 0, lastToast = 0;
+function watchTheEdge(){
+  const now = performance.now();
+  const dark = S.lum < 0.004, burnt = S.lum > 0.965;
+  if (!dark && !burnt){ deadSince = 0; btnSpark.classList.remove('pulse'); return; }
+  if (!deadSince) deadSince = now;
+  if (now - deadSince > 2600 && now - lastToast > 9000 && !S.frozen){
+    lastToast = now;
+    if (dark){ btnSpark.classList.add('pulse'); toast('the image has faded to nothing — spark it'); }
+    else     { toast('burning to white — ease the brightness, or clear'); }
+  }
+}
+
+/* ---------- 8 · The frame ---------------------------------------- */
+let rafId = 0;
+function frame(now){
+  rafId = requestAnimationFrame(frame);
+  if (!S.frozen){
+    const mods = herdMods(now);
+    stepLoop('A', 'B', S.v, now, mods);
+    stepLoop('B', 'A', S.v, now, mods);
+  }
+  composite(now);
+  if ((S.frame++ & 15) === 0) measure();
+  if (S.keep){ S.keep = false; keepFrame(); }
+}
+
+/* ---------- 9 · Knob widgets -------------------------------------- */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const A0 = -135, A1 = 135;   /* sweep, in degrees */
+function arcPath(cx, cy, r, a0, a1){
+  const p = a => [cx + r*Math.cos((a-90)*Math.PI/180), cy + r*Math.sin((a-90)*Math.PI/180)];
+  const [x0,y0] = p(a0), [x1,y1] = p(a1);
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${(a1-a0)>180?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+const knobs = {};
+function buildKnob(key){
+  const P = PARAMS[key];
+  const el = document.createElement('div');
+  el.className = 'knob';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'slider');
+  el.setAttribute('aria-label', P.label);
+  el.setAttribute('aria-valuemin', P.min);
+  el.setAttribute('aria-valuemax', P.max);
+
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('width', 44); svg.setAttribute('height', 44);
+  svg.setAttribute('viewBox', '0 0 44 44');
+
+  const cap = document.createElementNS(SVGNS, 'circle');
+  cap.setAttribute('cx',22); cap.setAttribute('cy',22); cap.setAttribute('r',14);
+  cap.setAttribute('fill','#1c150d'); cap.setAttribute('stroke','#3a2c1a');
+
+  const track = document.createElementNS(SVGNS, 'path');
+  track.setAttribute('d', arcPath(22,22,19,A0,A1));
+  track.setAttribute('fill','none'); track.setAttribute('stroke','#33281a');
+  track.setAttribute('stroke-width','2.5'); track.setAttribute('stroke-linecap','round');
+
+  const arc = document.createElementNS(SVGNS, 'path');
+  arc.setAttribute('class','arc-val');
+  arc.setAttribute('fill','none'); arc.setAttribute('stroke','var(--amber)');
+  arc.setAttribute('stroke-width','2.5'); arc.setAttribute('stroke-linecap','round');
+
+  const tick = document.createElementNS(SVGNS, 'line');
+  tick.setAttribute('stroke','var(--maple)'); tick.setAttribute('stroke-width','2');
+  tick.setAttribute('stroke-linecap','round');
+
+  svg.append(track, arc, cap, tick);
+  const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = P.label;
+  const val = document.createElement('div'); val.className = 'val';
+  el.append(svg, lbl, val);
+
+  function paint(){
+    const v = S.v[key];
+    const t = (v - P.min) / (P.max - P.min);
+    const a = A0 + t * (A1 - A0);
+    if (a > A0 + 0.5) arc.setAttribute('d', arcPath(22,22,19,A0,a));
+    else arc.removeAttribute('d');
+    const rad = (a - 90) * Math.PI / 180;
+    tick.setAttribute('x1', 22 + 6*Math.cos(rad));  tick.setAttribute('y1', 22 + 6*Math.sin(rad));
+    tick.setAttribute('x2', 22 + 12*Math.cos(rad)); tick.setAttribute('y2', 22 + 12*Math.sin(rad));
+    val.textContent = P.fmt ? P.fmt(v) : v.toFixed(3);
+    el.setAttribute('aria-valuenow', v.toFixed(4));
+    el.setAttribute('aria-valuetext', val.textContent);
+  }
+  function set(v){
+    v = Math.min(P.max, Math.max(P.min, v));
+    if (P.step) v = Math.round(v / P.step) * P.step;
+    S.v[key] = v;
+    paint();
+    clearPresetHighlight();
+  }
+  /* drag vertically, like a real knob under a careful finger */
+  let dragging = false, y0 = 0, v0 = 0;
+  el.addEventListener('pointerdown', e => {
+    dragging = true; y0 = e.clientY; v0 = S.v[key];
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const fine = e.shiftKey ? 0.15 : 1;
+    set(v0 + (y0 - e.clientY) / 150 * (P.max - P.min) * fine);
+  });
+  el.addEventListener('pointerup',   () => dragging = false);
+  el.addEventListener('pointercancel', () => dragging = false);
+  el.addEventListener('dblclick', () => set(P.def));
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    set(S.v[key] - Math.sign(e.deltaY) * (P.step || (P.max - P.min) / 120));
+  }, { passive:false });
+  el.addEventListener('keydown', e => {
+    const step = P.step || (P.max - P.min) / (e.shiftKey ? 400 : 80);
+    if (e.key === 'ArrowUp'   || e.key === 'ArrowRight'){ set(S.v[key] + step); e.preventDefault(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft'){  set(S.v[key] - step); e.preventDefault(); }
+    if (e.key === 'Home'){ set(P.def); e.preventDefault(); }
+  });
+  paint();
+  knobs[key] = { el, paint };
+  return el;
+}
+function buildDeck(){
+  const wrap = document.getElementById('groups');
+  for (const G of GROUPS){
+    const g = document.createElement('section');
+    g.className = 'group';
+    const h = document.createElement('h2');
+    h.innerHTML = G.name + '<em>' + G.note + '</em>';
+    const row = document.createElement('div');
+    row.className = 'knobs';
+    for (const [k, P] of Object.entries(PARAMS))
+      if (P.g === G.id) row.append(buildKnob(k));
+    g.append(h, row);
+    wrap.append(g);
+  }
+  const pWrap = document.getElementById('presets');
+  for (const name of Object.keys(PRESETS)){
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = name;
+    b.addEventListener('click', () => applyPreset(name, b));
+    pWrap.append(b);
+  }
+}
+function clearPresetHighlight(){
+  document.querySelectorAll('.chip.on').forEach(c => c.classList.remove('on'));
+}
+function applyPreset(name, chip){
+  const P = PRESETS[name];
+  for (const k of Object.keys(PARAMS))
+    S.v[k] = (k in P) ? P[k] : PARAMS[k].def;
+  S.offset.x = 0; S.offset.y = 0;
+  for (const k of Object.keys(knobs)) knobs[k].paint();
+  clearPresetHighlight();
+  if (chip) chip.classList.add('on');
+  spark(0.5, 0.5, 1.6);
+  toast(name.toLowerCase());
+}
+
+/* ---------- 10 · Sparks, transport, toasts ------------------------ */
+let sparkHue = 0;
+function spark(x, y, power = 1.4){
+  sparkHue += 1.9;
+  S.spark = { x, y, t: performance.now(), hue: sparkHue, power };
+}
+function clearVoid(){
+  buildBuffers();
+  toast('the void');
+  btnSpark.classList.add('pulse');
+}
+function keepFrame(){
+  /* the drawing buffer is not preserved across tasks, so copy it
+     synchronously — a photograph of the loop, not the loop itself */
+  const still = document.createElement('canvas');
+  still.width = canvas.width; still.height = canvas.height;
+  still.getContext('2d').drawImage(canvas, 0, 0);
+  still.toBlob(b => {
+    if (!b) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'petit-monde.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+}
+let toastTimer = 0;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  const deck = document.getElementById('deck');
+  t.style.bottom = (deck.offsetHeight + 24) + 'px';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+const btnSpark  = document.getElementById('btnSpark');
+const btnHerd   = document.getElementById('btnHerd');
+const btnFreeze = document.getElementById('btnFreeze');
+const meterMark = document.getElementById('meterMark');
+
+btnSpark.addEventListener('click', () => { spark(0.5, 0.5); btnSpark.classList.remove('pulse'); });
+document.getElementById('btnClear').addEventListener('click', clearVoid);
+document.getElementById('btnKeep').addEventListener('click', () => S.keep = true);
+btnFreeze.addEventListener('click', toggleFreeze);
+btnHerd.addEventListener('click', toggleHerd);
+document.getElementById('veil').addEventListener('click', () =>
+  document.body.classList.toggle('veiled'));
+
+function toggleFreeze(){
+  S.frozen = !S.frozen;
+  btnFreeze.classList.toggle('lit', S.frozen);
+  toast(S.frozen ? 'held still' : 'looping again');
+}
+function toggleHerd(){
+  S.herding = !S.herding;
+  btnHerd.classList.toggle('lit', S.herding);
+  document.body.classList.toggle('herding', S.herding);
+  toast(S.herding ? 'herding — riding the brightness for you' : 'the rods are yours');
+}
+
+/* ---------- 11 · The camera in your hands ------------------------- */
+/* Drag the screen = slide the camera on its rails.
+   A quick tap = hold a small flame up to the lens.                    */
+let ptr = null;
+canvas.addEventListener('pointerdown', e => {
+  ptr = { id: e.pointerId, x: e.clientX, y: e.clientY,
+          ox: S.offset.x, oy: S.offset.y, t: performance.now(), moved: 0 };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+  ptr.moved = Math.max(ptr.moved, Math.hypot(dx, dy));
+  const s = 1 / canvas.clientHeight;      /* lens units */
+  S.offset.x = Math.max(-0.6, Math.min(0.6, ptr.ox + dx * s));
+  S.offset.y = Math.max(-0.6, Math.min(0.6, ptr.oy - dy * s));
+});
+function endPtr(e){
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const quick = performance.now() - ptr.t < 260 && ptr.moved < 6;
+  if (quick){
+    const r = canvas.getBoundingClientRect();
+    spark((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height);
+    btnSpark.classList.remove('pulse');
+  }
+  ptr = null;
+}
+canvas.addEventListener('pointerup', endPtr);
+canvas.addEventListener('pointercancel', () => ptr = null);
+
+/* ---------- 12 · Keyboard ----------------------------------------- */
+addEventListener('keydown', e => {
+  if (!S.began) return;
+  if (e.target.closest('.knob') || e.target.tagName === 'BUTTON') return;
+  const k = e.key.toLowerCase();
+  if (k === ' '){ spark(0.5, 0.5); btnSpark.classList.remove('pulse'); e.preventDefault(); }
+  else if (k === 'f') toggleFreeze();
+  else if (k === 'd') toggleHerd();
+  else if (k === 'c') clearVoid();
+  else if (k === 'h') document.body.classList.toggle('veiled');
+});
+
+/* ---------- 13 · Housekeeping -------------------------------------- */
+let resizeTimer = 0;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!gl || !fbo) return;
+    buildBuffers();                    /* a new world needs a new bang */
+    if (S.began) spark(0.5, 0.5, 1.8);
+  }, 200);
+});
+document.addEventListener('visibilitychange', () => {
+  if (!S.began) return;
+  if (document.hidden){ cancelAnimationFrame(rafId); rafId = 0; }
+  else if (!rafId) rafId = requestAnimationFrame(frame);
+});
+
+/* the middlespace band, drawn once */
+(function(){
+  const band = document.getElementById('meterBand');
+  band.style.bottom = (MIDDLE.lo * 100) + '%';
+  band.style.height = ((MIDDLE.hi - MIDDLE.lo) * 100) + '%';
+})();
+
+/* ---------- 14 · Genesis ------------------------------------------- */
+buildDeck();
+document.getElementById('fiat').addEventListener('click', () => {
+  if (!gl || !herd) return;
+  document.getElementById('genesis').classList.add('gone');
+  S.began = true;
+  /* in the beginning: nothing — then a bang, and everything
+     interesting happens on the long way back to nothing */
+  spark(0.5, 0.5, 2.6);
+  S.herding = true;
+  btnHerd.classList.add('lit');
+  document.body.classList.add('herding');
+  rafId = requestAnimationFrame(frame);
+  setTimeout(() => toast('drag to move the camera · tap to spark'), 1600);
+});
+</script>
+</body>
+</html>

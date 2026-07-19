@@ -1,0 +1,1309 @@
+{
+  "v": 1,
+  "globals": {
+    "video": 60,
+    "res": 4
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "module",
+      "x": 131.47979631168582,
+      "y": -168.27986295348234,
+      "name": "Loop",
+      "v": {},
+      "sel": 0,
+      "momentary": false,
+      "open": false,
+      "patch": {
+        "nodes": [
+          {
+            "id": "camA",
+            "type": "camera",
+            "x": -146.75249565500687,
+            "y": -176.93895485552815,
+            "name": "RACHIS CAM",
+            "v": {
+              "rot": -0.052,
+              "zoom": 0.85,
+              "offx": 0.25,
+              "offy": 0.25,
+              "focus": 0,
+              "sharpen": 0,
+              "exposure": 1,
+              "agc": 0,
+              "contrast": 1,
+              "sat": 1,
+              "fringe": 0.0006692913385826772,
+              "bleed": 0,
+              "knee": 0,
+              "grain": 0
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true,
+            "ports": [
+              "rot",
+              "zoom",
+              "offx",
+              "offy"
+            ]
+          },
+          {
+            "id": "key3",
+            "type": "mixer",
+            "x": 495.3776406085018,
+            "y": 152.070369706728,
+            "name": "STAMP SEED",
+            "v": {
+              "mode": 1,
+              "keylvl": 0.02,
+              "bright": -0.0382513427734375,
+              "contrast": 1,
+              "sat": 1,
+              "hue": 0,
+              "delay": 0,
+              "persist": 0
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true,
+            "ports": [
+              "keylvl",
+              "hue"
+            ]
+          },
+          {
+            "id": "mon",
+            "type": "monitor",
+            "x": 1053.4239696067766,
+            "y": 58.62930121659808,
+            "name": "FERN",
+            "v": {
+              "bright": 0.02,
+              "contrast": 1.8,
+              "sat": 1,
+              "hue": 0,
+              "delay": 0,
+              "persist": 0.1
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "dial1",
+            "type": "dial",
+            "x": -322.48501475124834,
+            "y": -173.57491492504803,
+            "name": "CURL",
+            "v": {
+              "val": -0.010655517578123878,
+              "lerp": 0.8032775878906248
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "dial2",
+            "type": "dial",
+            "x": -323.7569348902881,
+            "y": -20.37735763632374,
+            "name": "REACH",
+            "v": {
+              "val": 0.22834645669291342,
+              "lerp": 0.573770751953125
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "n5",
+            "type": "dial",
+            "x": -322.0305225722359,
+            "y": 129.06337628503587,
+            "name": "DIAL 3",
+            "v": {
+              "val": -1,
+              "lerp": 0.163935546875
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          },
+          {
+            "id": "n6",
+            "type": "dial",
+            "x": -325.0305225722359,
+            "y": 282.0633762850359,
+            "name": "DIAL 4",
+            "v": {
+              "val": -0.8110236220472441,
+              "lerp": 0.19672241210937497
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          },
+          {
+            "id": "n10",
+            "type": "in",
+            "x": -604.4972863115507,
+            "y": -117.68141853003979,
+            "name": "Rotation",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n11",
+            "type": "in",
+            "x": -613.9972863115509,
+            "y": 5.818581469960236,
+            "name": "Zoom",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n12",
+            "type": "in",
+            "x": -662.9972863115509,
+            "y": 118.81858146996024,
+            "name": "X",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n13",
+            "type": "in",
+            "x": -682.9972863115509,
+            "y": 223.81858146996024,
+            "name": "Y",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n14",
+            "type": "in",
+            "x": -199.99728631155085,
+            "y": 489.81858146996024,
+            "name": "Stamp",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "v"
+          },
+          {
+            "id": "n15",
+            "type": "out",
+            "x": 370.00271368844915,
+            "y": -106.18141853003976,
+            "name": "OUT 1",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "v"
+          },
+          {
+            "id": "n16",
+            "type": "in",
+            "x": -700.0800043622196,
+            "y": 327.2391562275644,
+            "name": "IN 6",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n17",
+            "type": "dial",
+            "x": 104.97979631168573,
+            "y": 321.7201370465177,
+            "name": "DIAL 5",
+            "v": {
+              "val": 0.10833333333333328,
+              "lerp": 0.9016394042968751
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          },
+          {
+            "id": "n18",
+            "type": "monitor",
+            "x": 1029.5281042854817,
+            "y": 524.3807849487265,
+            "name": "MON 2",
+            "v": {
+              "bright": 0,
+              "contrast": 1,
+              "sat": 1,
+              "hue": 0,
+              "delay": 0,
+              "persist": 0
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          }
+        ],
+        "edges": [
+          {
+            "source": "mon",
+            "sourceHandle": "v:out",
+            "target": "camA",
+            "targetHandle": "v:in"
+          },
+          {
+            "source": "dial2",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:zoom"
+          },
+          {
+            "source": "camA",
+            "sourceHandle": "v:out",
+            "target": "key3",
+            "targetHandle": "v:b"
+          },
+          {
+            "source": "n5",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offx"
+          },
+          {
+            "source": "n6",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offy"
+          },
+          {
+            "source": "dial1",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:rot"
+          },
+          {
+            "source": "n10",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:rot"
+          },
+          {
+            "source": "n11",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:zoom"
+          },
+          {
+            "source": "n12",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offx"
+          },
+          {
+            "source": "n13",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offy"
+          },
+          {
+            "source": "key3",
+            "sourceHandle": "v:out",
+            "target": "mon",
+            "targetHandle": "v:in"
+          },
+          {
+            "source": "n14",
+            "sourceHandle": "v:out",
+            "target": "key3",
+            "targetHandle": "v:a"
+          },
+          {
+            "source": "camA",
+            "sourceHandle": "v:out",
+            "target": "n15",
+            "targetHandle": "v:in"
+          },
+          {
+            "source": "n16",
+            "sourceHandle": "c:out",
+            "target": "key3",
+            "targetHandle": "c:keylvl"
+          },
+          {
+            "source": "n17",
+            "sourceHandle": "c:out",
+            "target": "key3",
+            "targetHandle": "c:hue"
+          },
+          {
+            "source": "key3",
+            "sourceHandle": "v:out",
+            "target": "n18",
+            "targetHandle": "v:in"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n3",
+      "type": "monitor",
+      "x": 497.00271368844915,
+      "y": 24.818581469960236,
+      "name": "MON 1",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n4",
+      "type": "dial",
+      "x": -400.99728631155085,
+      "y": -231.18141853003976,
+      "name": "DIAL 1",
+      "v": {
+        "val": -0.35562151090366634,
+        "lerp": 1.180328369140625
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n5",
+      "type": "dial",
+      "x": -395.99728631155085,
+      "y": -74.18141853003976,
+      "name": "DIAL 2",
+      "v": {
+        "val": 1,
+        "lerp": 1.737705078125
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n6",
+      "type": "module",
+      "x": 576.0027136884491,
+      "y": 241.81858146996024,
+      "name": "Loop",
+      "v": {},
+      "sel": 0,
+      "momentary": false,
+      "open": false,
+      "patch": {
+        "nodes": [
+          {
+            "id": "camA",
+            "type": "camera",
+            "x": -146.75249565500687,
+            "y": -176.93895485552815,
+            "name": "RACHIS CAM",
+            "v": {
+              "rot": -0.052,
+              "zoom": 0.85,
+              "offx": 0.25,
+              "offy": 0.25,
+              "focus": 0,
+              "sharpen": 0,
+              "exposure": 1,
+              "agc": 0,
+              "contrast": 1,
+              "sat": 1,
+              "fringe": 0.000041666666666666665,
+              "bleed": 0,
+              "knee": 0,
+              "grain": 0
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true,
+            "ports": [
+              "rot",
+              "zoom",
+              "offx",
+              "offy"
+            ]
+          },
+          {
+            "id": "key3",
+            "type": "mixer",
+            "x": 369.3776406085018,
+            "y": 78.070369706728,
+            "name": "STAMP SEED",
+            "v": {
+              "mode": 1,
+              "keylvl": 0.067212890625,
+              "bright": -0.0801230875651042,
+              "contrast": 1,
+              "sat": 1.0494531249999999,
+              "hue": 0,
+              "delay": 0,
+              "persist": 0
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "mon",
+            "type": "monitor",
+            "x": 1053.4239696067766,
+            "y": 58.62930121659808,
+            "name": "FERN",
+            "v": {
+              "bright": 0.02,
+              "contrast": 1.8,
+              "sat": 1,
+              "hue": 0,
+              "delay": 0,
+              "persist": 0.1
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "dial1",
+            "type": "dial",
+            "x": -322.48501475124834,
+            "y": -173.57491492504803,
+            "name": "CURL",
+            "v": {
+              "val": -0.010655517578123878,
+              "lerp": 0.8032775878906248
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "dial2",
+            "type": "dial",
+            "x": -323.7569348902881,
+            "y": -20.37735763632374,
+            "name": "REACH",
+            "v": {
+              "val": 0.22834645669291342,
+              "lerp": 0.573770751953125
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": true
+          },
+          {
+            "id": "n5",
+            "type": "dial",
+            "x": -322.0305225722359,
+            "y": 129.06337628503587,
+            "name": "DIAL 3",
+            "v": {
+              "val": -1,
+              "lerp": 0.163935546875
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          },
+          {
+            "id": "n6",
+            "type": "dial",
+            "x": -325.0305225722359,
+            "y": 282.0633762850359,
+            "name": "DIAL 4",
+            "v": {
+              "val": -0.8110236220472441,
+              "lerp": 0.19672241210937497
+            },
+            "sel": 0,
+            "momentary": false,
+            "open": false
+          },
+          {
+            "id": "n10",
+            "type": "in",
+            "x": -604.4972863115507,
+            "y": -117.68141853003979,
+            "name": "Rotation",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n11",
+            "type": "in",
+            "x": -613.9972863115509,
+            "y": 5.818581469960236,
+            "name": "Zoom",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n12",
+            "type": "in",
+            "x": -662.9972863115509,
+            "y": 118.81858146996024,
+            "name": "X",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n13",
+            "type": "in",
+            "x": -682.9972863115509,
+            "y": 223.81858146996024,
+            "name": "Y",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "c"
+          },
+          {
+            "id": "n14",
+            "type": "in",
+            "x": -199.99728631155085,
+            "y": 489.81858146996024,
+            "name": "Stamp",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "v"
+          },
+          {
+            "id": "n15",
+            "type": "out",
+            "x": 220.00271368844915,
+            "y": -144.18141853003976,
+            "name": "OUT 1",
+            "v": {},
+            "sel": 0,
+            "momentary": false,
+            "open": false,
+            "flavor": "v"
+          }
+        ],
+        "edges": [
+          {
+            "source": "mon",
+            "sourceHandle": "v:out",
+            "target": "camA",
+            "targetHandle": "v:in"
+          },
+          {
+            "source": "dial2",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:zoom"
+          },
+          {
+            "source": "camA",
+            "sourceHandle": "v:out",
+            "target": "key3",
+            "targetHandle": "v:b"
+          },
+          {
+            "source": "n5",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offx"
+          },
+          {
+            "source": "n6",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offy"
+          },
+          {
+            "source": "dial1",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:rot"
+          },
+          {
+            "source": "n10",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:rot"
+          },
+          {
+            "source": "n11",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:zoom"
+          },
+          {
+            "source": "n12",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offx"
+          },
+          {
+            "source": "n13",
+            "sourceHandle": "c:out",
+            "target": "camA",
+            "targetHandle": "c:offy"
+          },
+          {
+            "source": "key3",
+            "sourceHandle": "v:out",
+            "target": "mon",
+            "targetHandle": "v:in"
+          },
+          {
+            "source": "n14",
+            "sourceHandle": "v:out",
+            "target": "key3",
+            "targetHandle": "v:a"
+          },
+          {
+            "source": "camA",
+            "sourceHandle": "v:out",
+            "target": "n15",
+            "targetHandle": "v:in"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n7",
+      "type": "monitor",
+      "x": 858.0027136884491,
+      "y": 82.81858146996024,
+      "name": "MON 2",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n8",
+      "type": "dial",
+      "x": 233.24139277763172,
+      "y": 108.88837302069182,
+      "name": "DIAL 3",
+      "v": {
+        "val": 0.16535433070866135,
+        "lerp": 1.5573767089843753
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n9",
+      "type": "dial",
+      "x": 348.19024824696453,
+      "y": 257.0583249170145,
+      "name": "DIAL 4",
+      "v": {
+        "val": -0.023622047244094446,
+        "lerp": 1.295081787109375
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n10",
+      "type": "dial",
+      "x": 267.27069721461953,
+      "y": 434.82204409259487,
+      "name": "DIAL 5",
+      "v": {
+        "val": -1,
+        "lerp": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n11",
+      "type": "dial",
+      "x": 384.71800728930737,
+      "y": 423.954330115444,
+      "name": "DIAL 6",
+      "v": {
+        "val": -1,
+        "lerp": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n12",
+      "type": "draw",
+      "x": -233.64219812147576,
+      "y": 32.3457502721014,
+      "name": "DRAW 1",
+      "v": {
+        "hue": 48,
+        "size": 2
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n13",
+      "type": "switch",
+      "x": 907.0027136884491,
+      "y": -152.17968721872245,
+      "name": "SW 1",
+      "v": {},
+      "sel": 1,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n14",
+      "type": "monitor",
+      "x": 1094.0027136884491,
+      "y": -169.17968721872245,
+      "name": "MON 3",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n15",
+      "type": "dial",
+      "x": -482.74561125475446,
+      "y": 135.47351525038923,
+      "name": "DIAL 7",
+      "v": {
+        "val": -1,
+        "lerp": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n16",
+      "type": "mixer",
+      "x": 824.1285512168474,
+      "y": -382.17968721872245,
+      "name": "MIX 1",
+      "v": {
+        "mode": 1,
+        "keylvl": 0.02,
+        "bright": 0,
+        "contrast": 1.1136614583333333,
+        "sat": 0.6065568033854166,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n18",
+      "type": "monitor",
+      "x": 948.9797963116857,
+      "y": 361.7201370465177,
+      "name": "MON 4",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n19",
+      "type": "monitor",
+      "x": 936.9797963116857,
+      "y": 552.7201370465177,
+      "name": "MON 5",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n20",
+      "type": "mixer",
+      "x": 1276.9797963116857,
+      "y": 648.7201370465177,
+      "name": "MIX 2",
+      "v": {
+        "mode": 1,
+        "keylvl": 0.45,
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n21",
+      "type": "camera",
+      "x": 1326.9797963116857,
+      "y": 347.7201370465177,
+      "name": "CAM 1",
+      "v": {
+        "rot": 0,
+        "zoom": 1,
+        "offx": 0,
+        "offy": 0,
+        "focus": 0,
+        "sharpen": 0,
+        "exposure": 1,
+        "agc": 0,
+        "contrast": 1,
+        "sat": 1,
+        "fringe": 0,
+        "bleed": 0,
+        "knee": 0,
+        "grain": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false,
+      "ports": [
+        "rot",
+        "zoom",
+        "offx",
+        "offy"
+      ]
+    },
+    {
+      "id": "n22",
+      "type": "dial",
+      "x": 566.9797963116857,
+      "y": 496.7201370465177,
+      "name": "DIAL 8",
+      "v": {
+        "val": -0.9617488606770833,
+        "lerp": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n23",
+      "type": "dial",
+      "x": 559.9797963116857,
+      "y": 684.7201370465177,
+      "name": "DIAL 9",
+      "v": {
+        "val": -0.10928955078125002,
+        "lerp": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n24",
+      "type": "monitor",
+      "x": 927.9797963116857,
+      "y": 832.7201370465177,
+      "name": "MON 6",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n25",
+      "type": "monitor",
+      "x": 898.9797963116858,
+      "y": 1066.7201370465177,
+      "name": "MON 7",
+      "v": {
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n26",
+      "type": "mixer",
+      "x": 1265.9797963116857,
+      "y": 1033.7201370465177,
+      "name": "MIX 3",
+      "v": {
+        "mode": 1,
+        "keylvl": 0.45,
+        "bright": 0,
+        "contrast": 1,
+        "sat": 1,
+        "hue": 0,
+        "delay": 0,
+        "persist": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n27",
+      "type": "camera",
+      "x": 1573.9797963116857,
+      "y": 1057.7201370465177,
+      "name": "CAM 2",
+      "v": {
+        "rot": 0,
+        "zoom": 1,
+        "offx": 0,
+        "offy": 0,
+        "focus": 0,
+        "sharpen": 0,
+        "exposure": 1,
+        "agc": 0,
+        "contrast": 1,
+        "sat": 1,
+        "fringe": 0,
+        "bleed": 0,
+        "knee": 0,
+        "grain": 0
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false,
+      "ports": [
+        "rot",
+        "zoom",
+        "offx",
+        "offy"
+      ]
+    },
+    {
+      "id": "n28",
+      "type": "dial",
+      "x": 828.3496192723665,
+      "y": 1252.453918171863,
+      "name": "DIAL 10",
+      "v": {
+        "val": 0.10382649739583338,
+        "lerp": 0.93442626953125
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n29",
+      "type": "dial",
+      "x": 947.7233627322919,
+      "y": 1330.306359558771,
+      "name": "DIAL 11",
+      "v": {
+        "val": -0.32786946614583334,
+        "lerp": 0.819671630859375
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n30",
+      "type": "draw",
+      "x": 410.02250088671417,
+      "y": 863.1917112373233,
+      "name": "DRAW 2",
+      "v": {
+        "hue": 30,
+        "size": 8
+      },
+      "sel": 0,
+      "momentary": false,
+      "open": false
+    },
+    {
+      "id": "n31",
+      "type": "switch",
+      "x": 738.5137729351263,
+      "y": 860.2883307100544,
+      "name": "MOM 1",
+      "v": {},
+      "sel": 0,
+      "momentary": true,
+      "open": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "n1",
+      "sourceHandle": "v:n15",
+      "target": "n3",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n4",
+      "sourceHandle": "c:out",
+      "target": "n1",
+      "targetHandle": "c:n10"
+    },
+    {
+      "source": "n5",
+      "sourceHandle": "c:out",
+      "target": "n1",
+      "targetHandle": "c:n11"
+    },
+    {
+      "source": "n3",
+      "sourceHandle": "v:out",
+      "target": "n6",
+      "targetHandle": "v:n14"
+    },
+    {
+      "source": "n6",
+      "sourceHandle": "v:n15",
+      "target": "n7",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n8",
+      "sourceHandle": "c:out",
+      "target": "n6",
+      "targetHandle": "c:n10"
+    },
+    {
+      "source": "n9",
+      "sourceHandle": "c:out",
+      "target": "n6",
+      "targetHandle": "c:n11"
+    },
+    {
+      "source": "n10",
+      "sourceHandle": "c:out",
+      "target": "n6",
+      "targetHandle": "c:n12"
+    },
+    {
+      "source": "n11",
+      "sourceHandle": "c:out",
+      "target": "n6",
+      "targetHandle": "c:n13"
+    },
+    {
+      "source": "n12",
+      "sourceHandle": "v:out",
+      "target": "n1",
+      "targetHandle": "v:n14"
+    },
+    {
+      "source": "n3",
+      "sourceHandle": "v:out",
+      "target": "n13",
+      "targetHandle": "v:in1"
+    },
+    {
+      "source": "n7",
+      "sourceHandle": "v:out",
+      "target": "n13",
+      "targetHandle": "v:in2"
+    },
+    {
+      "source": "n13",
+      "sourceHandle": "v:out",
+      "target": "n14",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n15",
+      "sourceHandle": "c:out",
+      "target": "n1",
+      "targetHandle": "c:n16"
+    },
+    {
+      "source": "n3",
+      "sourceHandle": "v:out",
+      "target": "n16",
+      "targetHandle": "v:a"
+    },
+    {
+      "source": "n7",
+      "sourceHandle": "v:out",
+      "target": "n16",
+      "targetHandle": "v:b"
+    },
+    {
+      "source": "n20",
+      "sourceHandle": "v:out",
+      "target": "n21",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n21",
+      "sourceHandle": "v:out",
+      "target": "n19",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n18",
+      "sourceHandle": "v:out",
+      "target": "n20",
+      "targetHandle": "v:b"
+    },
+    {
+      "source": "n19",
+      "sourceHandle": "v:out",
+      "target": "n20",
+      "targetHandle": "v:a"
+    },
+    {
+      "source": "n12",
+      "sourceHandle": "v:out",
+      "target": "n18",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n22",
+      "sourceHandle": "c:out",
+      "target": "n21",
+      "targetHandle": "c:rot"
+    },
+    {
+      "source": "n23",
+      "sourceHandle": "c:out",
+      "target": "n21",
+      "targetHandle": "c:zoom"
+    },
+    {
+      "source": "n24",
+      "sourceHandle": "v:out",
+      "target": "n26",
+      "targetHandle": "v:a"
+    },
+    {
+      "source": "n25",
+      "sourceHandle": "v:out",
+      "target": "n26",
+      "targetHandle": "v:b"
+    },
+    {
+      "source": "n26",
+      "sourceHandle": "v:out",
+      "target": "n27",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n27",
+      "sourceHandle": "v:out",
+      "target": "n25",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n28",
+      "sourceHandle": "c:out",
+      "target": "n27",
+      "targetHandle": "c:rot"
+    },
+    {
+      "source": "n29",
+      "sourceHandle": "c:out",
+      "target": "n27",
+      "targetHandle": "c:zoom"
+    },
+    {
+      "source": "n30",
+      "sourceHandle": "v:out",
+      "target": "n31",
+      "targetHandle": "v:in1"
+    },
+    {
+      "source": "n31",
+      "sourceHandle": "v:out",
+      "target": "n24",
+      "targetHandle": "v:in"
+    },
+    {
+      "source": "n21",
+      "sourceHandle": "v:out",
+      "target": "n31",
+      "targetHandle": "v:in2"
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+/* Herder — the viewer. Dark walnut, amber signal; the same voice as the
+   bench, pared to one screen and a strip. */
+
+:root {
+  --bg: #0d0b08;
+  --panel: #17120c;
+  --panel2: #1d1710;
+  --line: #33281a;
+  --line2: #4a3a22;
+  --amber: #e8a33d;
+  --maple: #caa06a;
+  --teal: #4fb8c2;
+  --red: #d8543f;
+  --ink: #d8c8ae;
+  --dim: #8a7a5e;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+
+/* the GL overlay: the pinned face only, everything else transparent */
+#glass {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.gl-err {
+  position: fixed;
+  inset: 40% 20% auto;
+  z-index: 100;
+  padding: 16px;
+  background: #2a1410;
+  border: 1px solid #7a3a2a;
+  color: #e8b0a0;
+  text-align: center;
+}
+
+/* ---- join screen -------------------------------------------------------- */
+
+.vw-join {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vw-card {
+  padding: 32px 40px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  text-align: center;
+  min-width: 280px;
+}
+
+.vw-title {
+  margin: 0;
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 28px;
+  color: var(--amber);
+  letter-spacing: 0.02em;
+}
+
+.vw-sub {
+  margin: 4px 0 24px;
+  color: var(--dim);
+}
+
+.vw-form {
+  display: flex;
+  gap: 8px;
+}
+
+.vw-code {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.vw-code:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
+.vw-btn {
+  padding: 0 16px;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vw-btn:hover:not(:disabled) { border-color: var(--amber); }
+.vw-btn:disabled { color: var(--dim); cursor: default; }
+
+/* ---- live screen -------------------------------------------------------- */
+
+.vw-live {
+  position: fixed;
+  inset: 0;
+}
+
+/* the full-window face well the engine paints the pinned screen into —
+   the glass canvas draws over it, so it only needs to hold the rect */
+.vw-face {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.vw-waiting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  z-index: 5;
+}
+
+/* the thin overlay strip, top-center */
+.vw-strip {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(23, 18, 12, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
+
+.vw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+.vw-dot-live { background: var(--teal); }
+.vw-dot-joining { background: var(--amber); }
+.vw-dot-ended { background: var(--red); }
+
+.vw-phase { color: var(--ink); }
+.vw-note { color: var(--dim); }
+
+.vw-leave {
+  padding: 2px 10px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  color: var(--maple);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vw-leave:hover { border-color: var(--red); color: var(--red); }
