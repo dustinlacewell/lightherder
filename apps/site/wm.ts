@@ -6,5 +6,6 @@ export default defineProject({
   has: {
     buildable: { command: 'pnpm build' },
     testable: { typecheck: 'pnpm typecheck' },
+    devable: { command: 'pnpm dev' },
   },
 })
