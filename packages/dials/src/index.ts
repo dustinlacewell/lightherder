@@ -9,9 +9,10 @@
  *   const { freq, amp } = read(params, { t: now })
  *
  * Each slot is independently tunable and modulatable. Attaching a
- * source to a slot replaces its value provenance with a recipe whose
- * own parameters are dials — which can themselves be modulated,
- * recursively.
+ * source adds its normalized signal, scaled by the attachment's
+ * `depth`, onto the slot's base value — the dial stays live, centered
+ * under the modulation. A source's own parameters are dials, which
+ * can themselves be modulated, recursively.
  *
  * The stdlib of sources (sine, tri, perlin1D, fbm, brown, smooth,
  * etc.) is auto-registered at import time — `import '@ldlework/dials'`
@@ -33,6 +34,7 @@ export type {
   DialMeta,
   Dials,
   DialsOut,
+  ModMode,
   Slot,
   SlotOut,
   Source,
@@ -57,7 +59,17 @@ export type {
   ParamsSpec,
 } from './source'
 
-export { attach, attachFrom, detach } from './attach'
+export {
+  attach,
+  attachFrom,
+  detach,
+  setDepth,
+  setMode,
+  DEFAULT_DEPTH,
+} from './attach'
+
+export { toPos, fromPos } from './space'
+export type { RangeMeta } from './space'
 
 export { read, sampleSlot, sampleSource } from './sample'
 
@@ -81,13 +93,10 @@ export {
   perlin1D,
   fbm,
   brown,
-  ramp,
   smooth,
   add,
   mul,
   lerp,
-  clamp,
-  remap,
   gate,
   phaseGate,
   STDLIB,

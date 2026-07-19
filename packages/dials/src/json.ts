@@ -3,7 +3,11 @@
  *
  * The serialized form mirrors the live tree:
  *
- *   slot:  { value: <T>, attached?: { name: string, params: { [k]: slot } } }
+ *   slot:  { value: <T>, depth?: number, mode?, attached?: { name: string, params: { [k]: slot } } }
+ *
+ * `depth` and `mode` are slot-level — the modulation half-width and
+ * shape — so they round-trip whether or not a source is attached (a
+ * slot can be armed ahead of attaching one).
  *
  * Type tags and source defs are NOT serialized — they live in code
  * and the registry. The serialized form is intentionally a thin
@@ -16,13 +20,25 @@
  * dial type, write your own (de)serializer pair.
  */
 
-import type { Dials, Slot } from './core'
+import type { Dials, ModMode, Slot } from './core'
 import { attachFrom, detach } from './attach'
 import { setDial } from './dial'
 import { getSource } from './source'
 
 export interface SlotSnap {
   value: unknown
+  /**
+   * Modulation half-width in knob-travel space, [0, 1] — slot-level,
+   * present regardless of attachment so an armed-but-unattached slot
+   * round-trips. Absent snapshots leave the slot's current depth.
+   */
+  depth?: number
+  /**
+   * Modulation mode — slot-level, present regardless of attachment so
+   * an armed-but-unattached slot round-trips. Absent snapshots leave
+   * the slot's current mode.
+   */
+  mode?: ModMode
   attached?: SourceSnap
 }
 
@@ -44,13 +60,20 @@ export function toJSON(dials: Dials): DialsSnap {
 }
 
 function slotToSnap(slot: Slot<unknown>): SlotSnap {
-  const snap: SlotSnap = { value: slot.dial.value }
+  const snap: SlotSnap = {
+    value: slot.dial.value,
+    depth: slot.modDepth,
+    mode: slot.modMode,
+  }
   if (slot.attached) {
     const params: Record<string, SlotSnap> = {}
     for (const k in slot.attached.params) {
       params[k] = slotToSnap(slot.attached.params[k] as Slot<unknown>)
     }
-    snap.attached = { name: slot.attached.def.name, params }
+    snap.attached = {
+      name: slot.attached.def.name,
+      params,
+    }
   }
   return snap
 }
@@ -94,4 +117,13 @@ function applySlotSnap(slot: Slot<unknown>, snap: SlotSnap): void {
   } else {
     detach(slot)
   }
+  // Apply the slot-level mode when present; an absent mode leaves the
+  // slot's current value (its 'center' default).
+  if (snap.mode) slot.modMode = snap.mode
+  // Apply the slot-level depth AFTER any attach so the attach-time
+  // seeding (which fires when modDepth is still 0) can't clobber an
+  // explicit snapshot value — including an explicit 0. A snapshot with
+  // no depth leaves the slot's current value, letting the seeding above
+  // apply as normal.
+  if (typeof snap.depth === 'number') slot.modDepth = snap.depth
 }

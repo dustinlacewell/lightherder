@@ -140,7 +140,6 @@ All produce `number`. Read `ctx.t` (seconds), `ctx.dt` (seconds), or
 | `square` | no | `t` | `center, depth, freq, duty, phase` |
 | `whiteNoise` | yes | – | `seed, center, depth` |
 | `valueNoise` | yes | `t` | `seed, center, depth, rate` |
-| `ramp` | yes | `dt` | `rate, reset` |
 | `smooth` | yes | `dt` | `signal, tau` |
 | `add` | no | – | `a, b` |
 | `mul` | no | – | `a, b` |

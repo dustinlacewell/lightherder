@@ -20,7 +20,6 @@ import type {
   Body,
   BodyFactory,
   Ctx,
-  OnAttach,
   Slot,
   Source,
   SourceDef,
@@ -53,12 +52,12 @@ export interface DefineSourceArgs<
   description?: string
   /** Output type tag — matches against `Slot.outType`. */
   outType: string
+  /** Normalized emission contract: `'bipolar'` [-1,1] or `'unipolar'` [0,1]. */
+  polarity: 'bipolar' | 'unipolar'
   /** Sub-parameter schema, including defaults. */
   params: ParamsSpec<P>
   /** Stateless body. For stateful sources use `defineStatefulSource`. */
   body: Body<P, Out>
-  /** Optional adapter for tailoring defaults to the host slot. */
-  onAttach?: OnAttach<P>
 }
 
 export interface DefineStatefulSourceArgs<
@@ -71,6 +70,8 @@ export interface DefineStatefulSourceArgs<
   description?: string
   /** Output type tag — matches against `Slot.outType`. */
   outType: string
+  /** Normalized emission contract: `'bipolar'` [-1,1] or `'unipolar'` [0,1]. */
+  polarity: 'bipolar' | 'unipolar'
   /** Sub-parameter schema, including defaults. */
   params: ParamsSpec<P>
   /**
@@ -79,8 +80,6 @@ export interface DefineStatefulSourceArgs<
    * instances of the same stateful source never share memory.
    */
   body: BodyFactory<P, Out>
-  /** Optional adapter for tailoring defaults to the host slot. */
-  onAttach?: OnAttach<P>
 }
 
 /**
@@ -91,8 +90,8 @@ export function defineSource<P extends Record<string, unknown>, Out>(
   args: DefineSourceArgs<P, Out>,
 ): SourceDef<P, Out> {
   return buildDef(
-    args.name, args.description, args.outType, args.params,
-    args.body, false, args.onAttach,
+    args.name, args.description, args.outType, args.polarity,
+    args.params, args.body, false,
   )
 }
 
@@ -108,8 +107,8 @@ export function defineStatefulSource<
   args: DefineStatefulSourceArgs<P, Out>,
 ): SourceDef<P, Out> {
   return buildDef(
-    args.name, args.description, args.outType, args.params,
-    args.body, true, args.onAttach,
+    args.name, args.description, args.outType, args.polarity,
+    args.params, args.body, true,
   )
 }
 
@@ -117,10 +116,10 @@ function buildDef<P extends Record<string, unknown>, Out>(
   name: string,
   description: string | undefined,
   outType: string,
+  polarity: 'bipolar' | 'unipolar',
   params: ParamsSpec<P>,
   body: Body<P, Out> | BodyFactory<P, Out>,
   stateful: boolean,
-  onAttach: OnAttach<P> | undefined,
 ): SourceDef<P, Out> {
   const paramThunks = {} as SourceDef<P, Out>['params']
   for (const k in params) {
@@ -132,10 +131,10 @@ function buildDef<P extends Record<string, unknown>, Out>(
     name,
     description,
     outType,
+    polarity,
     params: paramThunks,
     body,
     stateful,
-    onAttach,
   }
 }
 

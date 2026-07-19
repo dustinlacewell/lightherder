@@ -4,9 +4,14 @@
  * The mental model in one sentence:
  *
  *   A *dials* object is a flat record of named *slots*. Each slot is
- *   a literal value (a slider) or has a *source* attached whose body
- *   produces the value from its own sub-slots — any of which may
- *   themselves have sources attached, recursively.
+ *   a literal value (a slider) that may additionally carry an
+ *   *attached* signal source whose normalized signal, scaled by the
+ *   slot's own depth, modulates the slot's output around the user-set
+ *   value (`base + depth·signal` in knob-travel space). A source's own
+ *   sub-slots are themselves slots, modulatable recursively.
+ *
+ * The dial is always live: attaching never replaces the user's value,
+ * it centers a modulation envelope on it.
  *
  * Nothing in this file knows about time, audio, graphics, or React.
  * The library's whole job is: "given some context, walk the tree,
@@ -40,15 +45,15 @@ export interface DialMeta<T> {
   scale?: 'linear' | 'log'
   /**
    * Smoothing time constant in seconds. When set (and `> 0`), the
-   * slot's *literal* output — the value read when no source is attached
-   * — is one-pole lowpassed toward the dial's target value instead of
-   * snapping. So a user drag or a preset load eases in over roughly
-   * `lerp` seconds rather than jumping. `undefined`/`0` means snap
-   * (the default). Only meaningful for `T = number`.
+   * slot's *base* value is one-pole lowpassed toward the dial's target
+   * value instead of snapping. So a user drag or a preset load eases
+   * in over roughly `lerp` seconds rather than jumping. `undefined`/`0`
+   * means snap (the default). Only meaningful for `T = number`.
    *
-   * This smooths only the dial branch; an attached source drives the
-   * slot directly (smooth a source's output with the `smooth` source
-   * instead). Reads `ctx.dt`, matching the stdlib time convention.
+   * This smooths the base term; while a source is attached, modulation
+   * (`depth·signal`) adds on top of the smoothed base (smooth a
+   * source's own signal with the `smooth` source instead). Reads
+   * `ctx.dt`, matching the stdlib time convention.
    */
   lerp?: number
   /** Hint for the panel — e.g. 'oklch' for a color dial. */
@@ -71,6 +76,12 @@ export interface DialMeta<T> {
 export interface Dial<T> {
   readonly kind: 'dial'
   value: T
+  /**
+   * The construction-time value — the dial's code-defined home.
+   * Editors use it as the reset target (double-click / Home); loading
+   * a snapshot changes `value`, never this.
+   */
+  readonly initial: T
   readonly meta: DialMeta<T>
 }
 
@@ -95,16 +106,6 @@ export type BodyFactory<Params extends Record<string, unknown>, Out> = () => Bod
   Out
 >
 
-/**
- * Optional hook fired by `attachFrom()` after instantiation, letting
- * the source seed its parameter defaults from the host slot's range
- * contract (`host.dial.meta.min`/`max`/`step`).
- */
-export type OnAttach<Params extends Record<string, unknown>> = (
-  params: { [K in keyof Params]: Slot<Params[K]> },
-  host: Slot<unknown>,
-) => void
-
 export interface SourceDef<Params extends Record<string, unknown>, Out> {
   readonly kind: 'sourceDef'
   /** Globally unique name used for serialization and the picker. */
@@ -113,6 +114,14 @@ export interface SourceDef<Params extends Record<string, unknown>, Out> {
   readonly description?: string
   /** Return type tag — must match the host slot's `outType` to attach. */
   readonly outType: string
+  /**
+   * The source's normalized emission range contract: `'bipolar'`
+   * sources emit in `[-1, 1]`, `'unipolar'` sources in `[0, 1]`.
+   * Drives the panel's modulation-band rendering and the combine
+   * math's expectations — a bipolar signal swings the slot both ways
+   * around its base value; a unipolar one pushes only upward.
+   */
+  readonly polarity: 'bipolar' | 'unipolar'
   /**
    * Per-parameter defaults. Each entry is a recipe for the *initial*
    * sub-slot when this source is selected. The thunk gives each
@@ -131,8 +140,6 @@ export interface SourceDef<Params extends Record<string, unknown>, Out> {
   readonly body: Body<Params, Out> | BodyFactory<Params, Out>
   /** @internal — set to true if `body` is a `BodyFactory`. */
   readonly stateful: boolean
-  /** Optional adapter for tailoring defaults to the host slot. */
-  readonly onAttach?: OnAttach<Params>
 }
 
 /**
@@ -153,10 +160,23 @@ export interface Source<Params extends Record<string, unknown>, Out> {
 }
 
 /**
+ * How a source's normalized signal is applied around the slot's base
+ * value. `'center'` swings both ways (the classic bipolar behavior),
+ * `'up'` pushes only above the base, `'down'` only below. Independent
+ * of the source's `polarity` (which describes its raw emission range):
+ * the signal is normalized to a canonical shape first, then this mode
+ * decides which direction(s) the excursion travels. It is slot-level
+ * and user-owned (see `Slot.modMode`) — independent of the attached
+ * source, defaulting to `'center'`.
+ */
+export type ModMode = 'center' | 'up' | 'down'
+
+/**
  * A slot is the thing sampled. It carries a `dial` (the user-editable
- * literal value when no source is attached) and an optional
- * `attached` source that, when present, drives the slot's output
- * instead of the dial.
+ * value — always live, never replaced) and an optional `attached`
+ * source whose normalized signal, scaled by the slot's `modDepth` and
+ * shaped by its `modMode`, adds onto the base value in knob-travel
+ * space.
  *
  * `outType` is the type tag the registry uses to filter which sources
  * the picker offers.
@@ -166,6 +186,33 @@ export interface Slot<T> {
   readonly outType: string
   readonly dial: Dial<T>
   attached: Source<Record<string, unknown>, T> | null
+  /**
+   * Modulation half-width in knob-travel space, [0, 1]. Slot-level so
+   * it can be pre-set before any source is attached — the panel arms
+   * the envelope with it — and so it survives detach/reattach. `0`
+   * means no envelope. While a source is attached the sampler scales
+   * its normalized signal by this width around the base value.
+   */
+  modDepth: number
+  /**
+   * How the normalized signal is applied around the base value —
+   * `'center'` both ways, `'up'` only above, `'down'` only below.
+   * Slot-level and purely user-owned: `'center'` by default, unchanged
+   * by attaching a source (the sampler normalizes any source's emission
+   * into whatever mode is set), and surviving detach/reattach. Applies
+   * to whatever source is or later becomes attached.
+   */
+  modMode: ModMode
+  /**
+   * The value this slot resolved to on its most recent sample — the
+   * combined output (`base + depth·signal`) while modulated — written
+   * by the sampler every time the slot is pulled (attached or not),
+   * never by the UI. `undefined` until the first sample. This is how
+   * an editor can *display* the live modulated output without
+   * sampling it (stateful sources mutate on every sample, so
+   * UI-driven re-sampling would corrupt the host's signal).
+   */
+  lastSample?: T
   /**
    * @internal — one-pole filter memory for `meta.lerp` smoothing. Holds
    * the last emitted (smoothed) value of the dial branch. `NaN` until

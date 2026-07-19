@@ -17,7 +17,7 @@ import type { Dial, DialMeta, Slot } from './core'
  * Numeric dial — the common case. Type tag is always `'number'`.
  */
 export function dial(value: number, meta: DialMeta<number> = {}): Slot<number> {
-  return slotFromDial<number>('number', { kind: 'dial', value, meta })
+  return slotFromDial<number>('number', { kind: 'dial', value, initial: value, meta })
 }
 
 /**
@@ -31,7 +31,7 @@ export function typedDial<T>(
   value: T,
   meta: DialMeta<T> = {},
 ): Slot<T> {
-  return slotFromDial<T>(type, { kind: 'dial', value, meta })
+  return slotFromDial<T>(type, { kind: 'dial', value, initial: value, meta })
 }
 
 /**
@@ -39,7 +39,14 @@ export function typedDial<T>(
  * Exported because `defineSource` builds slots the same way.
  */
 export function slotFromDial<T>(type: string, dial: Dial<T>): Slot<T> {
-  return { kind: 'slot', outType: type, dial, attached: null }
+  return {
+    kind: 'slot',
+    outType: type,
+    dial,
+    attached: null,
+    modDepth: 0,
+    modMode: 'center',
+  }
 }
 
 /**

@@ -15,8 +15,8 @@
  */
 
 import type { ComponentType, ReactNode } from 'react'
-import type { Slot } from '../core'
-import { attachFrom, detach } from '../attach'
+import type { ModMode, Slot } from '../core'
+import { attachFrom, detach, setMode } from '../attach'
 import type { sourcesForType } from '../source'
 
 // ─── Prop shapes ──────────────────────────────────────────────────────
@@ -28,6 +28,59 @@ export interface SliderProps {
   step: number
   scale?: 'linear' | 'log'
   onChange: (v: number) => void
+  /**
+   * True while a source is attached to the slot this slider edits.
+   * `value`/`onChange` still work the slot's own dial — the value the
+   * slot returns to on detach — but a modulation-aware implementation
+   * can restyle itself and display the live output via `live`.
+   */
+  attached?: boolean
+  /**
+   * Accessor for the slot's most recent sampled output
+   * (`slot.lastSample`) — `undefined` until the host app first samples
+   * the slot. Read-only by construction: the accessor never samples,
+   * so polling it (e.g. from a rAF loop) cannot advance stateful
+   * sources. Implementations that ignore it (like `DefaultSlider`)
+   * simply keep editing the dial value.
+   */
+  live?: () => number | undefined
+  /**
+   * The slot's modulation half-width in knob-travel space, [0, 1] —
+   * slot-level, so it's present regardless of attachment (a slot can
+   * be armed ahead of attaching a source). A modulation-aware
+   * implementation renders the envelope (`base ± depth` bipolar,
+   * `base → base + depth` unipolar) around the dial's own value
+   * whenever it's non-zero.
+   */
+  depth?: number
+  /**
+   * Gesture hook for editing the attachment's depth (e.g. a
+   * right-button drag). Implementations that support the gesture call
+   * this with the new travel-space half-width; the Panel writes it
+   * onto the attachment.
+   */
+  onDepthChange?: (d: number) => void
+  /**
+   * The slot's modulation mode — slot-level, so always present for a
+   * numeric slot regardless of attachment. Drives how the editor draws
+   * the modulation envelope: `'center'` both ways around the base,
+   * `'up'` only above, `'down'` only below.
+   */
+  mode?: ModMode
+  /**
+   * The dial's construction-time value (`dial.initial`) — the reset
+   * target for editors with a reset gesture (double-click, Home).
+   */
+  defaultValue?: number
+  /**
+   * The slot's attach control, pre-rendered by the Panel. A slider
+   * implementation may host it *inside* itself (e.g. a knob placing the
+   * modulation glyph in its face) instead of leaving the Panel to lay
+   * it out in the row. When a slider consumes this, the Panel's Row
+   * should suppress its own copy to avoid rendering it twice. Optional
+   * and ignored by sliders that don't relocate it (like DefaultSlider).
+   */
+  attach?: ReactNode
 }
 
 export interface NumberFieldProps {
@@ -67,6 +120,14 @@ export interface RowProps {
   help?: ReactNode
   attach?: ReactNode
   nested?: ReactNode
+  /**
+   * The slot's own description (`meta.description`), passed raw so a Row
+   * implementation can surface it however it likes — e.g. making the
+   * label itself the hover target instead of rendering a separate help
+   * affordance. `help` remains the pre-rendered `(?)` node for Rows that
+   * prefer the default treatment; a Row uses one or the other.
+   */
+  description?: string
 }
 
 export interface HeadingProps {
@@ -90,6 +151,19 @@ export interface PanelComponents {
   Row: ComponentType<RowProps>
   Heading: ComponentType<HeadingProps>
   AttachControl: ComponentType<AttachControlProps>
+  /**
+   * The bundle's Slider renders its own value readout; Panel omits
+   * the separate NumberField in numeric rows.
+   */
+  sliderShowsValue?: boolean
+  /**
+   * The bundle's Slider hosts the attach control itself (e.g. inside a
+   * knob face). Panel passes the attach node to the Slider via
+   * `SliderProps.attach` and its Row omits the standalone attach cell,
+   * so the picker renders once, inside the dial. Numeric slots only —
+   * non-numeric attached slots still get the standalone control.
+   */
+  sliderHostsAttach?: boolean
 }
 
 // ─── Default implementations ──────────────────────────────────────────
@@ -235,19 +309,35 @@ export function DefaultHeading({ title }: HeadingProps): ReactNode {
 
 /**
  * Default attach control — single dropdown that picks the source
- * driving the slot.
+ * modulating the slot.
  *
- *   value=""        → no modulation (uses the dial's own value)
+ *   value=""        → no modulation (the dial's own value, unmodified)
  *   value=<name>    → that registered source is attached
  *
- * Selecting a different source while one is attached swaps cleanly
- * (detach + fresh attachFrom — old source state is discarded so
- * `onAttach` runs against the host's current contract).
+ * Selecting a different source while one is attached swaps to a fresh
+ * instance (old source state is discarded); the modulation depth and
+ * mode live on the slot, so the envelope the user dialed in survives
+ * the swap on its own.
+ *
+ * The mode-cycle button (± / + / −) sits alongside the dropdown and is
+ * always present — mode is slot-level state, so the shape can be
+ * pre-set before any source is attached.
  *
  * The dropdown itself goes through the configured `Dropdown`
  * component so adapters can restyle without re-implementing the
  * attach/detach logic.
  */
+const MODE_GLYPH: Record<ModMode, string> = {
+  center: '±',
+  up: '+',
+  down: '−',
+}
+const MODE_NEXT: Record<ModMode, ModMode> = {
+  center: 'up',
+  up: 'down',
+  down: 'center',
+}
+
 export function DefaultAttachControl({
   slot, candidates, onChange,
 }: AttachControlProps): ReactNode {
@@ -259,23 +349,38 @@ export function DefaultAttachControl({
     { value: '', label: 'none' },
     ...candidates.map((d) => ({ value: d.name, label: d.name })),
   ]
+  const mode = slot.modMode
   return (
-    <Dropdown
-      value={current}
-      options={options}
-      onChange={(name) => {
-        if (!name) {
-          detach(slot)
-        } else if (name !== current) {
-          // Detach first so the new attach starts from clean factory
-          // defaults via `onAttach`.
-          detach(slot)
-          const def = candidates.find((d) => d.name === name)
-          if (def) attachFrom(slot, def)
-        }
-        onChange()
-      }}
-    />
+    <>
+      <Dropdown
+        value={current}
+        options={options}
+        onChange={(name) => {
+          if (!name) {
+            detach(slot)
+          } else if (name !== current) {
+            // The depth and mode live on the slot and survive the swap
+            // on their own. The new source itself starts from fresh
+            // factory defaults.
+            detach(slot)
+            const def = candidates.find((d) => d.name === name)
+            if (def) attachFrom(slot, def)
+          }
+          onChange()
+        }}
+      />
+      <button
+        type="button"
+        className="dials-mode"
+        data-dials-mode={mode}
+        onClick={() => {
+          setMode(slot, MODE_NEXT[mode])
+          onChange()
+        }}
+      >
+        {MODE_GLYPH[mode]}
+      </button>
+    </>
   )
 }
 

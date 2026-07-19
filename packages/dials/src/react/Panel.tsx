@@ -8,6 +8,9 @@
  * picker is populated from `sourcesForType(slot.outType)`. Attaching
  * causes the slot to expand into a nested sub-panel for the source's
  * own params — themselves modulatable, recursively, no depth limit.
+ * Numeric slots keep their editor while attached: the slider shows
+ * the live modulated output (via the slot's `lastSample` stash) while
+ * still editing the slot's own dial.
  *
  * The Panel renders no concrete UI markup itself. Every visual piece
  * — slider, number input, dropdown, row layout, help icon, heading —
@@ -16,8 +19,9 @@
  * override individual parts (used by `@ldlework/phosphor-dials`).
  */
 
-import { useReducer, type ReactNode } from 'react'
+import { useCallback, useReducer, type ReactNode } from 'react'
 import type { Dials, Slot } from '../core'
+import { setDepth } from '../attach'
 import { setDial } from '../dial'
 import { sourcesForType } from '../source'
 import {
@@ -114,36 +118,45 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
     />
   ) : undefined
 
-  const attachedHelp = attached?.def.description ? (
-    <c.HelpTooltip
-      title={attached.def.name}
-      description={attached.def.description}
-    />
-  ) : null
-
-  const attachPicker =
+  // The attached source's description is the AttachControl's job to
+  // surface (its trigger/cells carry it) — no separate help affordance.
+  const attachNode =
     candidates.length > 0 || attached ? (
       <c.AttachControl
         slot={slot}
         candidates={candidates}
         onChange={onChange}
       />
-    ) : null
-
-  // Header order matches pre-refactor markup: label, slot-help,
-  // attach-picker, attached-source-help. We bundle the picker and the
-  // attached-source help into a single `attach` slot so the Row
-  // component can place them as one unit after `help`.
-  const attachNode =
-    attachPicker || attachedHelp ? (
-      <>
-        {attachPicker}
-        {attachedHelp}
-      </>
     ) : undefined
 
-  const control = attached ? null : (
-    <SlotEditorView slot={slot} editors={editors} onChange={onChange} />
+  // When the bundle's Slider hosts the attach control itself (e.g. the
+  // knob places the modulation glyph in its face), route the attach
+  // node into the numeric editor and drop the standalone row cell so it
+  // renders exactly once. Non-numeric slots always use the row cell.
+  const hostsAttach = Boolean(c.sliderHostsAttach) && slot.outType === 'number'
+  const hostedAttach = hostsAttach ? attachNode : undefined
+  const rowAttach = hostsAttach ? undefined : attachNode
+
+  // Numeric slots keep their editor while a source is attached — the
+  // slider/knob shows the live modulated output (via the lastSample
+  // stash) while drags still edit the slot's own dial, the value the
+  // slot returns to on detach. Non-numeric attached slots have no
+  // live display story yet, so they collapse to the nested panel only.
+  const control = attached ? (
+    slot.outType === 'number' ? (
+      <NumberEditor
+        slot={slot as Slot<number>}
+        onChange={onChange}
+        attach={hostedAttach}
+      />
+    ) : null
+  ) : (
+    <SlotEditorView
+      slot={slot}
+      editors={editors}
+      onChange={onChange}
+      attach={hostedAttach}
+    />
   )
 
   const nested = attached ? (
@@ -170,8 +183,9 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
         label={displayLabel}
         control={control}
         help={help}
-        attach={attachNode}
+        attach={rowAttach}
         nested={nested ?? undefined}
+        description={slot.dial.meta.description}
       />
     </div>
   )
@@ -181,13 +195,21 @@ function SlotEditorView({
   slot,
   editors,
   onChange,
+  attach,
 }: {
   slot: Slot<unknown>
   editors?: Record<string, SlotEditor>
   onChange: () => void
+  attach?: ReactNode
 }): ReactNode {
   if (slot.outType === 'number') {
-    return <NumberEditor slot={slot as Slot<number>} onChange={onChange} />
+    return (
+      <NumberEditor
+        slot={slot as Slot<number>}
+        onChange={onChange}
+        attach={attach}
+      />
+    )
   }
   const custom = editors?.[slot.outType]
   if (custom) {
@@ -210,9 +232,11 @@ function SlotEditorView({
 function NumberEditor({
   slot,
   onChange,
+  attach,
 }: {
   slot: Slot<number>
   onChange: () => void
+  attach?: ReactNode
 }): ReactNode {
   const c = usePanelComponents()
   const meta = slot.dial.meta
@@ -231,6 +255,18 @@ function NumberEditor({
     meta.lerp = seconds
     onChange()
   }
+  // Narrow accessors for modulation-aware sliders: whether a source is
+  // attached, the slot's last sampled output, the slot's own modDepth
+  // and modMode (both slot-level, present regardless of attachment).
+  // The raw Slot never crosses the components contract.
+  const live = useCallback(() => slot.lastSample, [slot])
+  const onDepthChange = useCallback(
+    (d: number) => {
+      setDepth(slot, d)
+      onChange()
+    },
+    [slot, onChange],
+  )
   return (
     <div
       className="dials-number"
@@ -246,15 +282,24 @@ function NumberEditor({
         step={step}
         scale={scale}
         onChange={set}
+        attached={slot.attached !== null}
+        live={live}
+        depth={slot.modDepth}
+        mode={slot.modMode}
+        onDepthChange={onDepthChange}
+        defaultValue={slot.dial.initial}
+        attach={attach}
       />
-      <c.NumberField
-        value={slot.dial.value}
-        min={min}
-        max={max}
-        step={step}
-        scale={scale}
-        onChange={set}
-      />
+      {c.sliderShowsValue ? null : (
+        <c.NumberField
+          value={slot.dial.value}
+          min={min}
+          max={max}
+          step={step}
+          scale={scale}
+          onChange={set}
+        />
+      )}
       {meta.lerp !== undefined ? (
         <c.LerpControl value={meta.lerp} onChange={setLerp} />
       ) : null}

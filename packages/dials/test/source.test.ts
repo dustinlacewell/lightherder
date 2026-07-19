@@ -14,6 +14,7 @@ import {
 const add = defineSource({
   name: 'test.add',
   outType: 'number',
+  polarity: 'bipolar',
   params: {
     a: { type: 'number', slot: () => dial(0) },
     b: { type: 'number', slot: () => dial(0) },
@@ -24,6 +25,7 @@ const add = defineSource({
 const counter = defineStatefulSource({
   name: 'test.counter',
   outType: 'number',
+  polarity: 'unipolar',
   params: {
     step: { type: 'number', slot: () => dial(1) },
   },
@@ -41,11 +43,13 @@ describe('defineSource()', () => {
     expect(add.kind).toBe('sourceDef')
     expect(add.name).toBe('test.add')
     expect(add.outType).toBe('number')
+    expect(add.polarity).toBe('bipolar')
     expect(add.stateful).toBe(false)
   })
 
   it('marks stateful defs', () => {
     expect(counter.stateful).toBe(true)
+    expect(counter.polarity).toBe('unipolar')
   })
 })
 
@@ -105,6 +109,7 @@ describe('registry', () => {
     const stringy = defineSource({
       name: 'test.s',
       outType: 'string',
+      polarity: 'bipolar',
       params: {},
       body: () => 'x',
     })
@@ -120,6 +125,7 @@ describe('registry', () => {
     const replacement = defineSource({
       name: 'test.add', // same name
       outType: 'number',
+      polarity: 'bipolar',
       params: {},
       body: () => 999,
     })
