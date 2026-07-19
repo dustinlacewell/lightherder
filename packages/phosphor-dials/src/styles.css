@@ -35,48 +35,260 @@
   padding: 2px 0;
 }
 
-.pd-row-header {
+/* Caption line — label (+ help) centered above the dial. */
+.pd-row-caption {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   min-height: 18px;
 }
 
+/*
+ * The label text is what centers over the dial. The help affordance is
+ * hung absolutely off the label's right edge so it never shifts the
+ * text off-center — the (?) just dangles past wherever the centered
+ * label ends.
+ */
 .pd-row-label {
+  position: relative;
   flex: 0 0 auto;
   font-weight: 500;
   color: var(--chrome-text, #d8d8e0);
 }
 
-.pd-row-help {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
+/*
+ * The title text is itself the hover target for the slot's description
+ * (no separate (?) affordance). A help cursor hints there's more on
+ * hover; rows without a description get plain text and the default
+ * cursor via the .pd-row-title-plain marker.
+ */
+.pd-row-title {
+  cursor: help;
 }
 
-/* Attach picker pushes to the right edge of the header. */
-.pd-row-attach {
-  flex: 1 1 auto;
+.pd-row-title-plain {
+  cursor: default;
+}
+
+/*
+ * Fold toggle for an attached source's nested drawer. Hung off the left
+ * of the centered label (mirroring the help affordance on the right) so
+ * it never shifts the title off-center. Present only on rows that carry
+ * a drawer.
+ */
+.pd-row-fold {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 2px;
   display: inline-flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+  font-size: 1em;
+  line-height: 1;
+  color: var(--chrome-text-muted, rgba(216, 216, 224, 0.6));
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pd-row-fold:hover {
+  color: var(--chrome-text, #d8d8e0);
+  background: var(--chrome-recess, rgba(0, 0, 0, 0.25));
+}
+
+/* No focus ring on the fold toggle — it's a pointer affordance, and the
+   ring flashing on (shift-)click reads as an unwanted border. */
+.pd-row-fold:focus,
+.pd-row-fold:focus-visible {
+  outline: none;
+}
+
+/*
+ * Attach picker tucks into the bottom-right corner of the control area,
+ * out of the title's way. Absolute against the relatively-positioned
+ * control so the knob can center independently.
+ */
+.pd-row-attach {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
   gap: 4px;
   align-items: center;
 }
 
 /*
+ * Bare variant — a non-numeric slot with no control renders the attach
+ * on its own line, right-aligned, no positioning context to anchor to.
+ */
+.pd-row-attach-bare {
+  position: static;
+  justify-content: flex-end;
+}
+
+/*
+ * Attach picker (IconPicker) modulation state. While a source is
+ * attached, the trigger glyph lights in the modulation accent — the
+ * same alternate hue the Knob's variation band uses — so a modulated
+ * row is spottable at a glance. Glyphs are SVG strokes, so the glow
+ * is a drop-shadow filter rather than text-shadow.
+ */
+.pd-attach-picker.is-attached .chrome-iconpicker-trigger {
+  color: var(--chrome-accent-mod);
+  filter: drop-shadow(0 0 3px var(--chrome-accent-mod-glow));
+}
+
+/*
+ * In-dial layout (GLYPH_IN_DIAL): the modulation glyph is painted as an
+ * inert SVG in the knob face's bottom gap — the 270° arc leaves the
+ * bottom-center open, so the mark nests there without covering the
+ * pointer or readout. There is no trigger button; a right-click
+ * anywhere on the dial opens the picker popover, which hangs from the
+ * same anchor. Rendered inside `.chrome-knob-dial` (position: relative)
+ * via the Knob's `tab` slot.
+ */
+.pd-knob-attach {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* the dial beneath owns the right-click */
+}
+
+/*
+ * The inert glyph — centered in the bottom gap of the arc. The box
+ * matches the glyph viewBox aspect (24×16 = 3:2), so every waveform
+ * fills it identically instead of being letterboxed into a square (the
+ * `none` circle is centered in the same box, so it stays consistent).
+ */
+.pd-knob-glyph {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  width: 14px;
+  height: 14px;
+  line-height: 0;
+  color: var(--chrome-text-muted, rgba(216, 216, 224, 0.55));
+}
+
+.pd-knob-glyph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Attached: the on-dial glyph lights in the modulation accent. */
+.pd-knob-glyph.is-attached {
+  color: var(--chrome-accent-mod);
+  filter: drop-shadow(0 0 3px var(--chrome-accent-mod-glow));
+}
+
+/*
+ * The triggerless picker anchor — zero-footprint, parked at the dial's
+ * bottom center so its popover (position: absolute; top: 100%) drops
+ * below the dial. Popover itself re-enables pointer events.
+ */
+.pd-attach-indial {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 0;
+}
+
+.pd-attach-indial .chrome-iconpicker-popover {
+  pointer-events: auto;
+  /* Center the popover under the dial rather than right-aligning it. */
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/*
+ * Mode segment — the picker popover's footer while a source is
+ * attached: a row of three recessed cells (the iconpicker-cell family)
+ * selecting the modulation mode (center / up / down). The active cell
+ * lights in the modulation accent, matching the attached trigger, so
+ * the picker and its mode control read as one modulated unit.
+ */
+.pd-mode-segment {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pd-mode-segment .chrome-iconpicker-cell.is-mode {
+  color: var(--chrome-accent-mod);
+  filter: drop-shadow(0 0 3px var(--chrome-accent-mod-glow));
+}
+
+/*
+ * Live source preview — the sparkline canvas inside the attach
+ * picker's hover cards. The card supplies the plate; this is a small
+ * recessed dark well (the chrome-help trigger idiom) the trace glows
+ * inside. `color` carries the modulation accent so the canvas can
+ * resolve its stroke from computed style.
+ */
+.pd-source-preview {
+  display: block;
+  width: 120px;
+  height: 36px;
+  margin-top: 6px;
+  border-radius: 4px;
+  color: var(--chrome-accent-mod);
+  background:
+    radial-gradient(
+      circle at 50% 60%,
+      var(--chrome-slate-darkest) 0%,
+      var(--chrome-slate-dark) 100%
+    );
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 0.6),
+    inset 0 -1px 0 var(--chrome-rim-light);
+}
+
+/*
  * The control row hosts whatever the slot type renders. For numeric
- * slots that's a Slider + NumberField in a single line — a 1fr grid
- * column for the slider, an auto-width column for the number field.
+ * slots that's a Knob + NumberField (+ ArcGauge lerp control when the
+ * slot declares `lerp`) in a single line — a 1fr grid column for the
+ * knob, auto-width columns for the rest.
+ */
+/*
+ * Control area — a relative positioning context so the attach picker
+ * can anchor to its bottom-right while the knob centers on its own.
+ * Reserve a little right gutter so the corner picker never overlaps the
+ * dial.
  */
 .pd-row-control {
-  display: block;
+  position: relative;
+  display: flex;
+  justify-content: center;
 }
 
 .pd-row-control [data-dials-number] {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px;
+  display: flex;
+  justify-content: center;
   align-items: center;
+  gap: 6px;
+}
+
+/*
+ * Pull the value readout up into the dial's bottom-gap whitespace. The
+ * 270° arc leaves the SVG's lower quarter empty, so the readout would
+ * otherwise float with a big void above it. Scoped to the phosphor-
+ * dials knob so the shared primitive's default spacing is untouched
+ * elsewhere.
+ */
+.pd-row-control .chrome-knob-value {
+  margin-top: -8px;
 }
 
 .pd-row-control .chrome-numberfield {
@@ -96,6 +308,12 @@
  * Nested sub-panel for an attached source's params. Indented and
  * marked with a brand-hue rail so the recursion is unambiguous.
  */
+/* Collapsed drawer — kept mounted (state preserved) but not shown. The
+   attribute selector beats .pd-row-nested's display:flex. */
+.pd-row-nested[hidden] {
+  display: none;
+}
+
 .pd-row-nested {
   margin-left: 10px;
   padding: 6px 0 6px 10px;
