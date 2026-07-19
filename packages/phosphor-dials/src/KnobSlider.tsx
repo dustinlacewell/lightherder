@@ -29,6 +29,7 @@ import {
   cloneElement,
   isValidElement,
   useEffect,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -111,20 +112,31 @@ export function KnobSlider({
 
   // Live poll — only while a source is attached. React bails out of
   // re-rendering when the polled value is unchanged, so an unsampled
-  // (or static) stash costs one no-op state set per frame. Cancelled
-  // on unmount and on detach (the effect re-runs with attached=false
-  // and clears the sample so the knob returns to value-only mode).
+  // (or static) stash costs one no-op state set per frame.
+  //
+  // The poll reads `live` through a ref, and the rAF effect is keyed
+  // ONLY on `attached` — NOT on `live`'s identity. A host commonly
+  // rebuilds the `live` accessor every render (a fresh closure per
+  // render is the natural way to write one); keying the effect on it
+  // would tear down and restart the rAF loop on every re-render,
+  // including re-renders provoked by a SIBLING knob's edit (one knob's
+  // op re-renders the whole node). Each restart drops a frame of polling
+  // and blips the sample — which reads as unrelated knobs jittering when
+  // you touch any one of them. Holding `live` in a ref makes the loop
+  // survive those re-renders untouched.
+  const liveRef = useRef(live)
+  liveRef.current = live
   useEffect(() => {
-    if (!attached || !live) {
+    if (!attached) {
       setLiveSample(undefined)
       return
     }
     let raf = requestAnimationFrame(function tick() {
-      setLiveSample(live())
+      setLiveSample(liveRef.current?.())
       raf = requestAnimationFrame(tick)
     })
     return () => cancelAnimationFrame(raf)
-  }, [attached, live])
+  }, [attached])
 
   const riding = attached && liveSample !== undefined
   return (

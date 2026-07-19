@@ -165,7 +165,12 @@ export function Knob({
   const [min, max] = range
   const rootRef = useRef<HTMLDivElement>(null)
   const capGradient = useId()
-  const drag = useRef<{ y: number; v: number } | null>(null)
+  // `moved` gates the baseline write: a plain click (press + release
+  // without crossing the threshold) must NOT write — otherwise a click
+  // on a modulated knob snaps the base to wherever the drag anchor sits
+  // and the notch flickers. The write starts only once the pointer has
+  // actually moved.
+  const drag = useRef<{ y: number; v: number; moved: boolean } | null>(null)
   // Right-button depth drag — separate state so value- and
   // depth-drags never interfere. `moved` tracks whether the pointer
   // crossed the tap threshold: a right-release that never moved is a
@@ -240,7 +245,7 @@ export function Knob({
       if (e.button !== 0) return
       e.preventDefault()
       ;(e.target as Element).setPointerCapture(e.pointerId)
-      drag.current = { y: e.clientY, v: toPos(baseline) }
+      drag.current = { y: e.clientY, v: toPos(baseline), moved: false }
     },
     [baseline, toPos, depth, onChangeDepth, onRightClick],
   )
@@ -259,6 +264,10 @@ export function Knob({
       }
       if (!drag.current) return
       const dy = drag.current.y - e.clientY
+      // Below the threshold this is still a click, not a drag — don't
+      // write, so a plain click never nudges the base or flickers the notch.
+      if (!drag.current.moved && Math.abs(dy) <= 3) return
+      drag.current.moved = true
       const fine = e.shiftKey ? 0.15 : 1
       const next = drag.current.v + (dy / 150) * fine
       setBaseline(fromPos(next))
@@ -349,6 +358,7 @@ export function Knob({
   // only above it, `'down'` only below. Ends clamp to the arc.
   const pb = clamp(toPos(baseline), 0, 1)
   const aBase = A0 + pb * (A1 - A0)
+  const radBase = ((aBase - 90) * Math.PI) / 180
   const bandLo =
     depth !== undefined && (mode === 'center' || mode === 'down')
       ? clamp(pb - depth, 0, 1)
@@ -424,7 +434,7 @@ export function Knob({
               )}
             />
           )}
-          {/* 5. cap + pointer */}
+          {/* 5. cap + pointer(s) */}
           <circle
             className="chrome-knob-cap"
             cx={C}
@@ -432,6 +442,21 @@ export function Knob({
             r={CAP_R}
             fill={`url(#${capGradient})`}
           />
+          {/* base pointer — where the user's knob is set. Shown alongside
+              the live pointer while modulated so both notches read at
+              once: the base you're setting, and the value riding on top.
+              Drawn first (under the live pointer). */}
+          {isLive && (
+            <line
+              className="chrome-knob-pointer chrome-knob-pointer-base"
+              x1={C + PTR_IN * Math.cos(radBase)}
+              y1={C + PTR_IN * Math.sin(radBase)}
+              x2={C + PTR_OUT * Math.cos(radBase)}
+              y2={C + PTR_OUT * Math.sin(radBase)}
+            />
+          )}
+          {/* live pointer — the modulated value (or just the base when
+              nothing rides) */}
           <line
             className="chrome-knob-pointer"
             x1={C + PTR_IN * Math.cos(rad)}

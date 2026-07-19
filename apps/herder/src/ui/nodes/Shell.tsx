@@ -2,7 +2,7 @@
    name, action buttons, drawer caret, remove), the port stack, the
    knob drawer, and the blitted face well. */
 
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
 import { SlotRow } from '@ldlework/dials/react';
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
@@ -184,7 +184,10 @@ function Drawer({ id, kind, data, exposed }: {
   id: string; kind: NodeKind; data: NodeData; exposed: string[];
 }) {
   const [, repaint] = useReducer((x: number) => x + 1, 0);
-  const live = liveOverrideFor(id);
+  /* stable per node id — a fresh accessor every render would restart
+     every KnobSlider's rAF poll on any sibling knob's edit (one knob's
+     op re-renders the whole node), blipping their live samples */
+  const live = useMemo(() => liveOverrideFor(id), [id]);
 
   /* a wire riding an exposed param starts/stops publishing under
      "id:key"; the SlotRow's liveOverride reads that presence at render,

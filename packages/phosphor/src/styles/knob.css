@@ -109,6 +109,18 @@
   filter: drop-shadow(0 0 2px var(--chrome-accent-mod-glow));
 }
 
+/* Base pointer: shown alongside the live one while modulated. It marks
+   the user-set value, so it keeps the base (lit-bright) colour even
+   though the live pointer beside it is the modulation accent — the two
+   notches read as "where I set it" vs "where it is now". Slightly
+   thinner so the live value stays the dominant mark. */
+.chrome-knob[data-live='true'] .chrome-knob-pointer-base {
+  stroke: var(--theme-lit-bright);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 1.5px var(--theme-lit-edge));
+  opacity: 0.85;
+}
+
 /* Caption: the param name, engraved under the dial. */
 .chrome-knob-label {
   font-size: 0.6rem;
