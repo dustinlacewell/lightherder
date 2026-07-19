@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type CSSProperties,
   type ReactNode,
 } from 'react'
@@ -166,6 +167,12 @@ export function Knob({
   const rootRef = useRef<HTMLDivElement>(null)
   const capGradient = useId()
   const drag = useRef<{ y: number; v: number } | null>(null)
+  // While the user is actively dragging the baseline, the knob shows the
+  // BASELINE (what their hand is setting) instead of the live modulated
+  // `value` — otherwise the pointer and readout chase the wobbling
+  // modulation and the drag feels like it's fighting the knob. Modulation
+  // resumes riding the moment they release.
+  const [dragging, setDragging] = useState(false)
   // Right-button depth drag — separate state so value- and
   // depth-drags never interfere. `moved` tracks whether the pointer
   // crossed the tap threshold: a right-release that never moved is a
@@ -241,6 +248,7 @@ export function Knob({
       e.preventDefault()
       ;(e.target as Element).setPointerCapture(e.pointerId)
       drag.current = { y: e.clientY, v: toPos(baseline) }
+      setDragging(true)
     },
     [baseline, toPos, depth, onChangeDepth, onRightClick],
   )
@@ -273,6 +281,7 @@ export function Knob({
       if (depthDrag.current && !depthDrag.current.moved) onRightClick?.()
       drag.current = null
       depthDrag.current = null
+      setDragging(false)
       try {
         ;(e.target as Element).releasePointerCapture(e.pointerId)
       } catch {
@@ -332,16 +341,20 @@ export function Knob({
     [baseline, step, defaultValue, setBaseline, toPos, fromPos],
   )
 
-  const readout = format ? format(value) : formatReadout(value * displayScale, unit)
+  // While dragging the baseline, the knob tracks the baseline so the hand
+  // isn't fighting the modulation wobble; otherwise it shows the live
+  // modulated value. Release resumes the ride.
+  const shown = dragging ? baseline : value
+  const readout = format ? format(shown) : formatReadout(shown * displayScale, unit)
 
-  // The pointer follows the live value; the fill arc runs start →
+  // The pointer follows the shown value; the fill arc runs start →
   // baseline (the user's setting), and while the live value wanders
   // off the baseline a separate accent arc spans baseline → value,
   // showing the offset rather than repainting the whole fill.
-  const fValue = clamp(toPos(value), 0, 1)
+  const fValue = clamp(toPos(shown), 0, 1)
   const aValue = A0 + fValue * (A1 - A0)
   const rad = ((aValue - 90) * Math.PI) / 180
-  const isLive = value !== baseline
+  const isLive = shown !== baseline
 
   // Band inlay: the modulation envelope, derived in position space
   // from the baseline and depth. `mode` picks the direction(s):
