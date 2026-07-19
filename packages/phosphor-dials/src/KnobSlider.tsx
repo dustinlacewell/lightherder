@@ -18,11 +18,11 @@
  * the knob edits the depth via `onDepthChange`.
  *
  * `scale: 'log'` passes straight through — the Knob maps drags through
- * log space internally, like phosphor's Slider. `step` is deliberately
- * NOT passed: dials synthesizes `(max - min) / 1000` for slots that
- * declare no step, and the Knob would quantize log ranges in value
- * space and shrink wheel notches to 0.1% — the Knob stays continuous
- * here.
+ * log space internally, like phosphor's Slider. `step` is now the slot's
+ * DECLARED notch only (the Panel passes `meta.step`, undefined for a
+ * continuous slot), so it forwards straight to the Knob: a discrete dial
+ * snaps to its notch, a continuous one stays smooth. No synthesized
+ * filler to guard against anymore.
  */
 
 import {
@@ -80,6 +80,7 @@ export function KnobSlider({
   value,
   min,
   max,
+  step,
   scale,
   onChange,
   attached,
@@ -137,6 +138,7 @@ export function KnobSlider({
       onRightClick={hostedAttach ? () => setPickerOpen(true) : undefined}
       scale={scale ?? 'linear'}
       size={knobSize}
+      {...(step !== undefined ? { step } : {})}
       {...(showLabel && typeof label === 'string' ? { label } : {})}
       onChangeBaseline={onChange}
       defaultValue={defaultValue}

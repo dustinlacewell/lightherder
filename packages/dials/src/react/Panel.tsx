@@ -347,7 +347,12 @@ function NumberEditor({
   const meta = slot.dial.meta
   const min = meta.min ?? 0
   const max = meta.max ?? 1
-  const step = meta.step ?? (max - min) / 1000
+  // The DECLARED step only — a discrete slot's quantization notch, passed
+  // through verbatim (undefined when the slot is continuous). Each slider
+  // owns its own fine fallback, so a real step is never confused with a
+  // synthesized default: a discrete dial snaps everywhere, a continuous
+  // one moves freely.
+  const step = meta.step
   const scale = meta.scale
   const set = (v: number) => {
     actions.setValue(path, slot, v)

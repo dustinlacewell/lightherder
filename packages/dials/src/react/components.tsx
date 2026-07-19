@@ -34,7 +34,15 @@ export interface SliderProps {
   value: number
   min: number
   max: number
-  step: number
+  /**
+   * The slot's quantization notch (`meta.step`), in user units — present
+   * only for a DISCRETE slot. Absent for a continuous one: each slider
+   * owns its own fine-grained fallback (a knob stays continuous, a linear
+   * slider uses `(max - min) / 1000`), so a real declared step is never
+   * confused with a synthesized default. A discrete slot snaps to this
+   * everywhere — drag, wheel, keys.
+   */
+  step?: number
   scale?: 'linear' | 'log'
   onChange: (v: number) => void
   /**
@@ -104,7 +112,9 @@ export interface NumberFieldProps {
   value: number
   min: number
   max: number
-  step: number
+  /** The slot's quantization notch (`meta.step`) — present only for a
+      discrete slot; absent (continuous) lets the field step freely. */
+  step?: number
   scale?: 'linear' | 'log'
   onChange: (v: number) => void
 }
@@ -303,7 +313,9 @@ export function DefaultSlider({
       type="range"
       min={min}
       max={max}
-      step={step}
+      // A discrete slot snaps to its declared step; a continuous one gets
+      // a fine linear notch (a bare range input would default step to 1).
+      step={step ?? (max - min) / 1000}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
     />
@@ -320,7 +332,9 @@ export function DefaultNumberField({
       type="number"
       min={min}
       max={max}
-      step={step}
+      // Discrete slot → its notch; continuous → a fine spinner step (a
+      // bare number input's spinner would otherwise default to 1).
+      step={step ?? (max - min) / 1000}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
     />
