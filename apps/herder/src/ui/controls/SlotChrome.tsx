@@ -42,21 +42,29 @@ export function SlotChrome({ path, slot, children }: SlotChromeProps) {
   const learning = midi.isLearning(target);
   const mode = midi.bindingFor(target)?.mode;
 
-  /* right-click policy, ported from the bespoke Knob:
-       shift+right-click  → toggle the control port (root slots only)
-       right-click        → learn / cancel / unbind
-       ctrl+right-click   → flip a bound target absolute⇄relative
-     (a root slot uses shift for the port toggle, so its mode-flip moves
-     to ctrl; a sub-slot has no port, so plain shift is free — but keep
-     ctrl uniform for the flip regardless.) */
+  /* right-click policy. PLAIN right-click belongs to the knob — it opens
+     the modulation picker (phosphor's onRightClick) — so the chrome only
+     acts on a MODIFIED right-click and lets an unmodified one fall
+     through untouched:
+       ctrl+right-click        → learn / cancel / unbind MIDI
+       ctrl+shift+right-click  → flip a bound target absolute⇄relative
+       shift+right-click       → toggle the control port (root slots only)
+     A plain right-click is left entirely alone (no preventDefault, no
+     stopPropagation), so the knob's own picker gesture runs. */
   const onContextMenu = (e: React.MouseEvent): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (rootKey != null && e.shiftKey) { node!.togglePort(rootKey); return; }
-    if (learning) { midi.cancelLearn(); return; }
-    if (bound && e.ctrlKey) { midi.toggleMode(target); bump(); return; }
-    if (bound) { midi.unbind(target); bump(); return; }
-    midi.startLearn(target, () => bump());
+    if (rootKey != null && e.shiftKey && !e.ctrlKey) {
+      e.preventDefault(); e.stopPropagation();
+      node!.togglePort(rootKey); return;
+    }
+    if (e.ctrlKey) {
+      e.preventDefault(); e.stopPropagation();
+      if (learning) { midi.cancelLearn(); return; }
+      if (bound && e.shiftKey) { midi.toggleMode(target); bump(); return; }
+      if (bound) { midi.unbind(target); bump(); return; }
+      midi.startLearn(target, () => bump());
+      return;
+    }
+    /* plain right-click → the knob's modulation picker; don't intercept */
   };
 
   const title = midiTitle(slot, { learning, bound, mode, port: rootKey != null ? portOn : undefined });
@@ -85,7 +93,8 @@ function midiTitle(
   const portLine = s.port !== undefined
     ? `\n\nshift+right-click: ${s.port ? 'remove its control port' : 'expose as a control port on this device'}`
     : '';
-  const midiLine = `\n\nright-click: ${s.learning ? 'cancel MIDI learn' : s.bound ? 'unbind MIDI CC' : 'MIDI learn'}`
-    + (s.bound ? `\nctrl+right-click: ${s.mode === 'relative' ? 'relative encoder → absolute' : 'absolute → relative encoder'}` : '');
+  const midiLine = `\n\nright-click: open the modulation picker`
+    + `\nctrl+right-click: ${s.learning ? 'cancel MIDI learn' : s.bound ? 'unbind MIDI CC' : 'MIDI learn'}`
+    + (s.bound ? `\nctrl+shift+right-click: ${s.mode === 'relative' ? 'relative encoder → absolute' : 'absolute → relative encoder'}` : '');
   return head + portLine + midiLine;
 }
