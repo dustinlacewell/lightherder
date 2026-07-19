@@ -1,8 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { dial, read, type Dials } from '@ldlework/dials'
-import { Panel } from '@ldlework/dials/react'
-import { dialPanelComponents } from '@ldlework/phosphor-dials'
+import {
+  Panel,
+  defaultSlotActions,
+  type SlotActions,
+  type SlotChromeProps,
+} from '@ldlework/dials/react'
+import { dialPanelComponents, makeDialPanelComponents } from '@ldlework/phosphor-dials'
 import '@ldlework/phosphor-dials/styles.css'
 
 /**
@@ -90,4 +95,141 @@ function LiveModulationPanel() {
  */
 export const WithModulation: StoryObj<typeof Panel> = {
   render: () => <LiveModulationPanel />,
+}
+
+// ─── Consumer seams (Phase 1 extension points) ───────────────────────
+//
+// The story below exercises the three seams a host app (herder) needs:
+// `actions` (mediated mutation), `liveOverride` (an external effective
+// value riding on top of the slot), and `SlotChrome` (per-slot app
+// adornment around the editor). It stands in for the herder integration
+// before that lands, so the seams are eyeball-able in isolation.
+
+const seamDials: Dials = {
+  zoom: dial(0.5, { min: 0, max: 1, description: 'Recursion zoom.' }),
+  rot: dial(0, { min: -1, max: 1, description: 'Recursion rotation.' }),
+}
+
+/**
+ * A per-slot chrome adornment: a small dot beside the knob whose title
+ * shows the slot's path — proof the path threads through and that a host
+ * can hang app UI around the editor without forking it.
+ */
+function DotChrome({ path, children }: SlotChromeProps) {
+  return (
+    <div style={{ position: 'relative' }}>
+      {children}
+      <span
+        title={`slot path: ${path.join(' / ')}`}
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: 'var(--chrome-accent-mod, #6cf)',
+          boxShadow: '0 0 4px var(--chrome-accent-mod-glow, #6cf)',
+        }}
+      />
+    </div>
+  )
+}
+
+/**
+ * Wires the three seams. `actions` logs each mutation to a running tape
+ * (visible below the panel) and then applies the default in-place
+ * mutation — the mediation is observable without changing behavior.
+ * `liveOverride` rides `zoom` with a slow synthetic sine, so its knob
+ * shows a moving "ridden" value with no source attached (the control-
+ * port ride herder needs). `SlotChrome` hangs the DotChrome on each row.
+ */
+function SeamPanel() {
+  const [tape, setTape] = useState<string[]>([])
+  const t = useRef(0)
+  useEffect(() => {
+    let raf = requestAnimationFrame(function tick() {
+      t.current += 0.02
+      raf = requestAnimationFrame(tick)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  const log = (msg: string) =>
+    setTape((tp) => [msg, ...tp].slice(0, 6))
+
+  const actions: Partial<SlotActions> = {
+    setValue: (path, slot, v) => {
+      log(`setValue ${path.join('/')} = ${Number(v).toFixed(3)}`)
+      defaultSlotActions.setValue(path, slot, v)
+    },
+    attach: (path, slot, name) => {
+      log(`attach ${path.join('/')} <- ${name ?? 'none'}`)
+      defaultSlotActions.attach(path, slot, name)
+    },
+    setDepth: (path, slot, d) => {
+      log(`depth ${path.join('/')} = ${d.toFixed(2)}`)
+      defaultSlotActions.setDepth(path, slot, d)
+    },
+    setMode: (path, slot, m) => {
+      log(`mode ${path.join('/')} = ${m}`)
+      defaultSlotActions.setMode(path, slot, m)
+    },
+  }
+
+  const liveOverride = (path: string[]) =>
+    path.length === 1 && path[0] === 'zoom'
+      ? () => 0.5 + 0.4 * Math.sin(t.current)
+      : undefined
+
+  return (
+    <div style={{ width: 260 }}>
+      <Panel
+        title="Seams"
+        id="demo"
+        dials={seamDials}
+        components={{ ...dialPanelComponents, SlotChrome: DotChrome }}
+        actions={actions}
+        liveOverride={liveOverride}
+      />
+      <pre
+        style={{
+          marginTop: 12,
+          padding: 8,
+          fontSize: 10,
+          lineHeight: 1.5,
+          minHeight: 90,
+          background: 'rgba(0,0,0,0.3)',
+          borderRadius: 4,
+          color: 'var(--chrome-text-muted, #9a9)',
+        }}
+      >
+        {tape.length ? tape.join('\n') : 'drag a knob, attach a source…'}
+      </pre>
+    </div>
+  )
+}
+
+/**
+ * The consumer extension seams in isolation: mediated `actions` (each
+ * mutation is logged then applied), a `liveOverride` riding `zoom`
+ * externally, per-slot `SlotChrome` dots carrying the slot path, and a
+ * smaller knob size via `makeDialPanelComponents({ knobSize })`.
+ */
+export const ConsumerSeams: StoryObj<typeof Panel> = {
+  render: () => <SeamPanel />,
+}
+
+/** The knob-size factory: a tighter 40px bundle for dense node UIs. */
+export const SmallKnobs: StoryObj<typeof Panel> = {
+  render: () => (
+    <Panel
+      title="Compact"
+      dials={{
+        a: dial(0.5, { min: 0, max: 1, description: 'A.' }),
+        b: dial(0.5, { min: 0, max: 1, description: 'B.' }),
+      }}
+      components={makeDialPanelComponents({ knobSize: 40 })}
+    />
+  ),
 }

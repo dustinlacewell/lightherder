@@ -36,6 +36,32 @@ import {
 import { Knob } from '@ldlework/phosphor'
 import type { SliderProps } from '@ldlework/dials/react'
 
+/**
+ * Knob face diameter in px. Set per bundle via `makeDialPanelComponents`
+ * (a host with tighter node UI wants smaller knobs than the 56px
+ * default). Not a per-slot prop — it's a bundle-wide look, so it rides
+ * a module-level default the factory rebinds.
+ */
+const DEFAULT_KNOB_SIZE = 56
+
+export interface KnobSliderExtras {
+  /** Knob diameter in px (default 56). */
+  knobSize?: number
+}
+
+/**
+ * A `KnobSlider` variant bound to a fixed knob size, for the panel
+ * bundle's `Slider` slot (which the Panel calls with plain `SliderProps`
+ * only). Returns the shared `KnobSlider` reference for the default size
+ * so the common bundle stays referentially stable.
+ */
+export function sizedKnobSlider(
+  knobSize?: number,
+): (props: SliderProps) => ReactNode {
+  if (knobSize === undefined) return KnobSlider
+  return (props: SliderProps) => <KnobSlider {...props} knobSize={knobSize} />
+}
+
 export function KnobSlider({
   value,
   min,
@@ -49,7 +75,8 @@ export function KnobSlider({
   mode,
   defaultValue,
   attach,
-}: SliderProps): ReactNode {
+  knobSize = DEFAULT_KNOB_SIZE,
+}: SliderProps & KnobSliderExtras): ReactNode {
   const [liveSample, setLiveSample] = useState<number | undefined>(undefined)
   // When the Panel routes the attach control here (sliderHostsAttach),
   // we own the picker's open state so a right-click on the dial can open
@@ -93,7 +120,7 @@ export function KnobSlider({
       onChangeDepth={onDepthChange}
       onRightClick={hostedAttach ? () => setPickerOpen(true) : undefined}
       scale={scale ?? 'linear'}
-      size={56}
+      size={knobSize}
       onChangeBaseline={onChange}
       defaultValue={defaultValue}
       tab={

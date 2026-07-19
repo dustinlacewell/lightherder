@@ -81,6 +81,21 @@ function slotToSnap(slot: Slot<unknown>): SlotSnap {
 // ─── Load ─────────────────────────────────────────────────────────────
 
 /**
+ * Options for `fromJSON`.
+ */
+export interface FromJSONOptions {
+  /**
+   * What to do when a snapshot names a source that isn't registered:
+   *   - `'throw'` (default): fail loudly — silently dropping a
+   *     modulation chain is usually worse than failing.
+   *   - `'drop'`: keep the slot's value, drop the attachment, and move
+   *     on. For hosts that load hostile/stale state and must degrade
+   *     per-field rather than lose a whole document.
+   */
+  onMissingSource?: 'throw' | 'drop'
+}
+
+/**
  * Apply a snapshot to an existing dials object.
  *
  * Mutates `dials` in place — the assumption is you constructed the
@@ -89,19 +104,34 @@ function slotToSnap(slot: Slot<unknown>): SlotSnap {
  * snapshot keys not present on the object are silently ignored
  * (forward-compat).
  */
-export function fromJSON(dials: Dials, snap: DialsSnap): void {
+export function fromJSON(
+  dials: Dials,
+  snap: DialsSnap,
+  opts: FromJSONOptions = {},
+): void {
+  const onMissing = opts.onMissingSource ?? 'throw'
   for (const key in dials) {
     const slotSnap = snap[key]
     if (!slotSnap) continue
-    applySlotSnap(dials[key] as Slot<unknown>, slotSnap)
+    applySlotSnap(dials[key] as Slot<unknown>, slotSnap, onMissing)
   }
 }
 
-function applySlotSnap(slot: Slot<unknown>, snap: SlotSnap): void {
+function applySlotSnap(
+  slot: Slot<unknown>,
+  snap: SlotSnap,
+  onMissing: 'throw' | 'drop',
+): void {
   setDial(slot, snap.value)
   if (snap.attached) {
     const def = getSource(snap.attached.name)
     if (!def) {
+      if (onMissing === 'drop') {
+        // Degrade: keep the value, lose the attachment, survive.
+        detach(slot)
+        applySlotLevel(slot, snap)
+        return
+      }
       throw new Error(
         `dials: cannot hydrate — source "${snap.attached.name}" is not registered. ` +
           `Call registerSource(${snap.attached.name}) before fromJSON().`,
@@ -111,19 +141,23 @@ function applySlotSnap(slot: Slot<unknown>, snap: SlotSnap): void {
     for (const k in source.params) {
       const childSnap = snap.attached.params[k]
       if (childSnap) {
-        applySlotSnap(source.params[k] as Slot<unknown>, childSnap)
+        applySlotSnap(source.params[k] as Slot<unknown>, childSnap, onMissing)
       }
     }
   } else {
     detach(slot)
   }
-  // Apply the slot-level mode when present; an absent mode leaves the
-  // slot's current value (its 'center' default).
+  applySlotLevel(slot, snap)
+}
+
+/**
+ * Apply the slot-level modulation state (mode, then depth) from a
+ * snapshot. Depth is applied AFTER any attach so the attach-time
+ * seeding (which fires while modDepth is still 0) can't clobber an
+ * explicit snapshot value — including an explicit 0. Absent fields
+ * leave the slot's current value (its 'center' / seeded default).
+ */
+function applySlotLevel(slot: Slot<unknown>, snap: SlotSnap): void {
   if (snap.mode) slot.modMode = snap.mode
-  // Apply the slot-level depth AFTER any attach so the attach-time
-  // seeding (which fires when modDepth is still 0) can't clobber an
-  // explicit snapshot value — including an explicit 0. A snapshot with
-  // no depth leaves the slot's current value, letting the seeding above
-  // apply as normal.
   if (typeof snap.depth === 'number') slot.modDepth = snap.depth
 }

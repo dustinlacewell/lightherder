@@ -28,8 +28,8 @@
  */
 
 import type { ReactNode } from 'react'
-import { attachFrom, detach, setMode, type ModMode, type SourceDef } from '@ldlework/dials'
-import type { AttachControlProps } from '@ldlework/dials/react'
+import { type ModMode, type SourceDef } from '@ldlework/dials'
+import { useSlotActions, type AttachControlProps } from '@ldlework/dials/react'
 import { HoverCard, IconPicker, type IconPickerOption } from '@ldlework/phosphor'
 import { MODE_ICONS, noneIcon, sourceIcon } from './SourceIcons'
 import { SourcePreview } from './SourcePreview'
@@ -136,8 +136,9 @@ export function AttachGlyph({
 }
 
 export function AttachControl({
-  slot, candidates, onChange, open, onOpenChange, inDial = false,
+  path = [], slot, candidates, onChange, open, onOpenChange, inDial = false,
 }: AttachControlProps & HostedAttachProps): ReactNode {
+  const actions = useSlotActions()
   if (candidates.length === 0 && !slot.attached) return null
   const current = slot.attached?.def.name ?? ''
   const currentDef = candidates.find((d) => d.name === current)
@@ -172,22 +173,16 @@ export function AttachControl({
         <ModeFooter
           mode={slot.modMode}
           onPick={(m) => {
-            setMode(slot, m)
+            actions.setMode(path, slot, m)
             onChange()
           }}
         />
       }
       onChange={(name) => {
-        if (!name) {
-          detach(slot)
-        } else if (name !== current) {
-          // The depth and mode live on the slot and survive the swap on
-          // their own. The new source itself starts from fresh factory
-          // defaults.
-          detach(slot)
-          const def = candidates.find((d) => d.name === name)
-          if (def) attachFrom(slot, def)
-        }
+        // Depth and mode live on the slot and survive a swap on their
+        // own. `attach` handles detach (null), no-op (same name), and
+        // swap-to-fresh; the mediator (or the default) performs it.
+        actions.attach(path, slot, name || null)
         onChange()
       }}
     />

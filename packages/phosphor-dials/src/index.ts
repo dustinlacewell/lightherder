@@ -23,7 +23,7 @@ import {
 } from '@ldlework/phosphor'
 import { type PanelComponents } from '@ldlework/dials/react'
 
-import { KnobSlider } from './KnobSlider'
+import { sizedKnobSlider } from './KnobSlider'
 import { LerpControl } from './LerpControl'
 import { Row } from './Row'
 import { Heading } from './Heading'
@@ -55,23 +55,41 @@ export { sourceIcon, SOURCE_ICONS, fallbackIcon, noneIcon } from './SourceIcons'
  */
 export const GLYPH_IN_DIAL = true
 
-export const dialPanelComponents: PanelComponents = {
-  Slider: KnobSlider,
-  NumberField,
-  Dropdown,
-  HelpTooltip,
-  Row,
-  Heading,
-  LerpControl,
-  // Icon-based source picker: glyph trigger + popover glyph grid,
-  // replicating the default's attach/swap/detach (and depth-carrying)
-  // logic over phosphor's IconPicker.
-  AttachControl,
-  // The Knob carries its own lit readout, so numeric rows skip the
-  // separate NumberField. It stays registered above for any contract
-  // consumer that still wants one.
-  sliderShowsValue: true,
-  // When on, the Knob hosts the attach picker in its face and the Row
-  // drops its corner cell (see GLYPH_IN_DIAL).
-  sliderHostsAttach: GLYPH_IN_DIAL,
+/** Options for `makeDialPanelComponents`. */
+export interface DialPanelOptions {
+  /** Knob face diameter in px (default 56). */
+  knobSize?: number
 }
+
+/**
+ * Build a phosphor-styled `PanelComponents` bundle. Pass `knobSize` to
+ * fit tighter node UIs (herder's drawer knobs are 44px, globals 38px).
+ * Zero-config `dialPanelComponents` is `makeDialPanelComponents()`.
+ */
+export function makeDialPanelComponents(
+  opts: DialPanelOptions = {},
+): PanelComponents {
+  return {
+    Slider: sizedKnobSlider(opts.knobSize),
+    NumberField,
+    Dropdown,
+    HelpTooltip,
+    Row,
+    Heading,
+    LerpControl,
+    // Icon-based source picker: glyph trigger + popover glyph grid,
+    // replicating the default's attach/swap/detach (and depth-carrying)
+    // logic over phosphor's IconPicker.
+    AttachControl,
+    // The Knob carries its own lit readout, so numeric rows skip the
+    // separate NumberField. It stays registered above for any contract
+    // consumer that still wants one.
+    sliderShowsValue: true,
+    // When on, the Knob hosts the attach picker in its face and the Row
+    // drops its corner cell (see GLYPH_IN_DIAL).
+    sliderHostsAttach: GLYPH_IN_DIAL,
+  }
+}
+
+/** Phosphor-styled bundle at the default knob size. */
+export const dialPanelComponents: PanelComponents = makeDialPanelComponents()

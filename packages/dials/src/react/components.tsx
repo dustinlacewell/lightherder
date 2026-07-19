@@ -16,12 +16,21 @@
 
 import type { ComponentType, ReactNode } from 'react'
 import type { ModMode, Slot } from '../core'
-import { attachFrom, detach, setMode } from '../attach'
-import type { sourcesForType } from '../source'
+import { attachFrom, detach, setDepth, setMode } from '../attach'
+import { setDial } from '../dial'
+import { sourcesForType } from '../source'
 
 // ─── Prop shapes ──────────────────────────────────────────────────────
 
 export interface SliderProps {
+  /**
+   * Stable path to this slot from the Panel root: the root slot key,
+   * then one key per attached-source param descended into (e.g.
+   * `['zoom', 'freq']`). Present when the Panel is given a path-aware
+   * walk; a consumer keys MIDI targets, live channels, or ops off it.
+   * Ignored by implementations that don't need identity.
+   */
+  path?: string[]
   value: number
   min: number
   max: number
@@ -115,6 +124,8 @@ export interface HelpTooltipProps {
 }
 
 export interface RowProps {
+  /** Stable path to this row's slot from the Panel root (see SliderProps.path). */
+  path?: string[]
   label: ReactNode
   control: ReactNode
   help?: ReactNode
@@ -135,9 +146,75 @@ export interface HeadingProps {
 }
 
 export interface AttachControlProps {
+  /** Stable path to the attach target's slot (see SliderProps.path). */
+  path?: string[]
   slot: Slot<unknown>
   candidates: ReturnType<typeof sourcesForType>
   onChange: () => void
+}
+
+// ─── Mediated mutation (SlotActions) ──────────────────────────────────
+//
+// Every mutation the Panel or an AttachControl performs on a slot —
+// value edit, attach/detach, depth, mode, lerp — routes through this
+// contract. The default implementation calls dials' own in-place
+// mutators directly, so zero-config consumers are unchanged. A host
+// that owns a mediation layer (an op/dispatch pipeline, a collab gate)
+// supplies its own `actions`: it translates `(path, slot)` into its own
+// write and performs NO direct mutation — the mediator does, and the
+// same live slot tree is reached on every client.
+
+export interface SlotActions {
+  /** Edit the slot's own dial value (the base the slot returns to on detach). */
+  setValue(path: string[], slot: Slot<unknown>, v: unknown): void
+  /** Attach a source by name, or detach when `sourceName` is null. */
+  attach(path: string[], slot: Slot<unknown>, sourceName: string | null): void
+  /** Set the modulation half-width (travel space, [0, 1]). */
+  setDepth(path: string[], slot: Slot<unknown>, depth: number): void
+  /** Set the modulation mode. */
+  setMode(path: string[], slot: Slot<unknown>, mode: ModMode): void
+  /** Set the smoothing time constant `meta.lerp`, in seconds. */
+  setLerp(path: string[], slot: Slot<unknown>, seconds: number): void
+}
+
+/**
+ * Default actions — direct in-place mutation, the historical behavior.
+ * `attach` resolves the source name against the slot's candidate set,
+ * mirroring `DefaultAttachControl`'s swap semantics (detach first, then
+ * attach a fresh instance; depth and mode survive on the slot).
+ */
+export const defaultSlotActions: SlotActions = {
+  setValue: (_path, slot, v) => setDial(slot, v),
+  attach: (_path, slot, sourceName) => {
+    if (!sourceName) {
+      detach(slot)
+      return
+    }
+    const current = slot.attached?.def.name ?? ''
+    if (sourceName === current) return
+    detach(slot)
+    const def = sourcesForType(slot.outType).find((d) => d.name === sourceName)
+    if (def) attachFrom(slot, def)
+  },
+  setDepth: (_path, slot, depth) => setDepth(slot, depth),
+  setMode: (_path, slot, mode) => setMode(slot, mode),
+  setLerp: (_path, slot, seconds) => {
+    slot.dial.meta.lerp = seconds
+  },
+}
+
+/**
+ * Per-slot chrome — an optional wrapper the Panel puts around each
+ * row's control. A host renders app adornments here (indicator dots,
+ * a context-menu policy, a MIDI-learn registration) around whatever
+ * editor the bundle draws, WITHOUT forking the editor and without dials
+ * knowing anything about those app concerns. `children` is the row's
+ * control; return it wrapped.
+ */
+export interface SlotChromeProps {
+  path: string[]
+  slot: Slot<unknown>
+  children: ReactNode
 }
 
 // ─── The bundle ───────────────────────────────────────────────────────
@@ -151,6 +228,22 @@ export interface PanelComponents {
   Row: ComponentType<RowProps>
   Heading: ComponentType<HeadingProps>
   AttachControl: ComponentType<AttachControlProps>
+  /**
+   * Optional per-slot wrapper around each row's control. When supplied,
+   * the Panel wraps every numeric editor in it, passing the slot's path
+   * and slot. A host uses it to hang app adornments (indicator dots, a
+   * context menu, a live registration) around the editor without
+   * forking it. Omitted → controls render bare.
+   */
+  SlotChrome?: ComponentType<SlotChromeProps>
+  /**
+   * Optional container the Panel wraps its rows in — the title bar plus
+   * the row stack. Defaults to a plain `dials-panel` div. A consumer
+   * that wants a different arrangement (a horizontal strip, say)
+   * supplies its own Frame, or bypasses Panel entirely and composes
+   * exported `SlotRow`s.
+   */
+  Frame?: ComponentType<{ title?: string; children: ReactNode }>
   /**
    * The bundle's Slider renders its own value readout; Panel omits
    * the separate NumberField in numeric rows.
@@ -339,10 +432,11 @@ const MODE_NEXT: Record<ModMode, ModMode> = {
 }
 
 export function DefaultAttachControl({
-  slot, candidates, onChange,
+  path = [], slot, candidates, onChange,
 }: AttachControlProps): ReactNode {
   // Consume context lazily to avoid an import cycle at module top.
   const { Dropdown } = usePanelComponents()
+  const actions = useSlotActions()
   if (candidates.length === 0 && !slot.attached) return null
   const current = slot.attached?.def.name ?? ''
   const options: DropdownOption[] = [
@@ -356,16 +450,10 @@ export function DefaultAttachControl({
         value={current}
         options={options}
         onChange={(name) => {
-          if (!name) {
-            detach(slot)
-          } else if (name !== current) {
-            // The depth and mode live on the slot and survive the swap
-            // on their own. The new source itself starts from fresh
-            // factory defaults.
-            detach(slot)
-            const def = candidates.find((d) => d.name === name)
-            if (def) attachFrom(slot, def)
-          }
+          // Depth and mode live on the slot and survive a swap on their
+          // own. `attach` handles null (detach), same-name (no-op), and
+          // swap-to-fresh; the mediator (or the default) performs it.
+          actions.attach(path, slot, name || null)
           onChange()
         }}
       />
@@ -374,7 +462,7 @@ export function DefaultAttachControl({
         className="dials-mode"
         data-dials-mode={mode}
         onClick={() => {
-          setMode(slot, MODE_NEXT[mode])
+          actions.setMode(path, slot, MODE_NEXT[mode])
           onChange()
         }}
       >
@@ -410,4 +498,15 @@ export const PanelComponentsProvider = PanelComponentsContext.Provider
 
 export function usePanelComponents(): PanelComponents {
   return useContext(PanelComponentsContext)
+}
+
+// Slot-mutation mediation, provided separately from the components so a
+// host can override the write path without touching the visual bundle.
+// Defaults to direct in-place mutation (the historical behavior).
+const SlotActionsContext = createContext<SlotActions>(defaultSlotActions)
+
+export const SlotActionsProvider = SlotActionsContext.Provider
+
+export function useSlotActions(): SlotActions {
+  return useContext(SlotActionsContext)
 }

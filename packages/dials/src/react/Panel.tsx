@@ -21,14 +21,16 @@
 
 import { useCallback, useReducer, type ReactNode } from 'react'
 import type { Dials, Slot } from '../core'
-import { setDepth } from '../attach'
-import { setDial } from '../dial'
 import { sourcesForType } from '../source'
 import {
   PanelComponentsProvider,
+  SlotActionsProvider,
   defaultPanelComponents,
+  defaultSlotActions,
   usePanelComponents,
+  useSlotActions,
   type PanelComponents,
+  type SlotActions,
 } from './components'
 
 /**
@@ -42,12 +44,39 @@ export type SlotEditor<T = unknown> = (props: {
   slot: Slot<T>
 }) => ReactNode
 
+/**
+ * A host-supplied external live value for a slot — the effective value
+ * some app-side layer resolves ON TOP of the slot's own modulation
+ * (e.g. herder's control-port wire riding a param). Given a slot's path
+ * and slot, return an accessor for that external value, or `undefined`
+ * to fall back to the slot's own `lastSample` stash. The returned
+ * accessor is polled like `SliderProps.live` — it must be read-only.
+ */
+export type LiveOverride = (
+  path: string[],
+  slot: Slot<unknown>,
+) => (() => number | undefined) | undefined
+
 export interface PanelProps<D extends Dials> {
   dials: D
   /** Custom editors keyed by slot.outType. Numbers get a built-in slider. */
   editors?: Record<string, SlotEditor>
   /** Optional label shown above the panel. */
   title?: string
+  /**
+   * Root path prefix for every slot's identity path. A host that hosts
+   * multiple Panels (or embeds slots under an app-side id) passes e.g.
+   * `['n3']` so paths read `['n3','zoom','freq']`. Defaults to `[]`.
+   */
+  id?: string
+  /**
+   * Mediation for every slot mutation the Panel performs. Defaults to
+   * direct in-place mutation; a host with an op/collab pipeline passes
+   * its own — see `SlotActions`.
+   */
+  actions?: Partial<SlotActions>
+  /** External live value per slot — see `LiveOverride`. */
+  liveOverride?: LiveOverride
   /**
    * Override any subset of the UI parts the Panel renders. Anything
    * not supplied falls back to `defaultPanelComponents`. The merged
@@ -68,6 +97,9 @@ export function Panel<D extends Dials>({
   dials,
   editors,
   title,
+  id,
+  actions,
+  liveOverride,
   components,
   onChange,
 }: PanelProps<D>): ReactNode {
@@ -79,37 +111,73 @@ export function Panel<D extends Dials>({
   const merged: PanelComponents = components
     ? { ...defaultPanelComponents, ...components }
     : defaultPanelComponents
-  const { Heading } = merged
+  const mergedActions: SlotActions = actions
+    ? { ...defaultSlotActions, ...actions }
+    : defaultSlotActions
+  const { Heading, Frame } = merged
+  const root = id ? [id] : []
+  const rows = Object.entries(dials).map(([key, slot]) => (
+    <SlotRow
+      key={key}
+      label={key}
+      path={[...root, key]}
+      slot={slot as Slot<unknown>}
+      editors={editors}
+      liveOverride={liveOverride}
+      onChange={notify}
+    />
+  ))
+  const body = Frame ? (
+    <Frame title={title}>{rows}</Frame>
+  ) : (
+    <div className="dials-panel" data-dials-panel="">
+      {title ? <Heading title={title} /> : null}
+      {rows}
+    </div>
+  )
   return (
     <PanelComponentsProvider value={merged}>
-      <div className="dials-panel" data-dials-panel="">
-        {title ? <Heading title={title} /> : null}
-        {Object.entries(dials).map(([key, slot]) => (
-          <SlotRow
-            key={key}
-            label={key}
-            slot={slot as Slot<unknown>}
-            editors={editors}
-            onChange={notify}
-          />
-        ))}
-      </div>
+      <SlotActionsProvider value={mergedActions}>{body}</SlotActionsProvider>
     </PanelComponentsProvider>
   )
 }
 
-interface SlotRowProps {
+export interface SlotRowProps {
   label: string
+  /**
+   * Stable identity path to this slot (root prefix + keys). Threaded
+   * into every child (RowProps/SliderProps/AttachControlProps) and every
+   * SlotActions call. Defaults to `[label]` when omitted, so a bare
+   * `<SlotRow label slot/>` still works.
+   */
+  path?: string[]
   slot: Slot<unknown>
   editors?: Record<string, SlotEditor>
+  /** External live value per slot — see `LiveOverride`. */
+  liveOverride?: LiveOverride
   onChange: () => void
 }
 
-function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
+/**
+ * One slot's row: caption, editor, attach control, and — when a source
+ * is attached — a nested sub-panel of the source's own params (itself a
+ * stack of `SlotRow`s, recursively). Exported so a consumer can compose
+ * its own container arrangement (e.g. a horizontal strip) without
+ * reimplementing the recursion, editor selection, or attach logic.
+ */
+export function SlotRow({
+  label,
+  path,
+  slot,
+  editors,
+  liveOverride,
+  onChange,
+}: SlotRowProps): ReactNode {
   const c = usePanelComponents()
   const attached = slot.attached
   const candidates = sourcesForType(slot.outType)
   const displayLabel = slot.dial.meta.label ?? label
+  const rowPath = path ?? [label]
 
   const help = slot.dial.meta.description ? (
     <c.HelpTooltip
@@ -123,6 +191,7 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
   const attachNode =
     candidates.length > 0 || attached ? (
       <c.AttachControl
+        path={rowPath}
         slot={slot}
         candidates={candidates}
         onChange={onChange}
@@ -142,22 +211,37 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
   // stash) while drags still edit the slot's own dial, the value the
   // slot returns to on detach. Non-numeric attached slots have no
   // live display story yet, so they collapse to the nested panel only.
-  const control = attached ? (
+  const editor = attached ? (
     slot.outType === 'number' ? (
       <NumberEditor
+        path={rowPath}
         slot={slot as Slot<number>}
+        liveOverride={liveOverride}
         onChange={onChange}
         attach={hostedAttach}
       />
     ) : null
   ) : (
     <SlotEditorView
+      path={rowPath}
       slot={slot}
       editors={editors}
+      liveOverride={liveOverride}
       onChange={onChange}
       attach={hostedAttach}
     />
   )
+
+  // A host may wrap each control in per-slot chrome (indicator dots, a
+  // context menu, a live registration) without forking the editor.
+  const control =
+    editor && c.SlotChrome ? (
+      <c.SlotChrome path={rowPath} slot={slot}>
+        {editor}
+      </c.SlotChrome>
+    ) : (
+      editor
+    )
 
   const nested = attached ? (
     <div className="dials-source" data-dials-source={attached.def.name}>
@@ -165,8 +249,10 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
         <SlotRow
           key={k}
           label={k}
+          path={[...rowPath, k]}
           slot={sub as Slot<unknown>}
           editors={editors}
+          liveOverride={liveOverride}
           onChange={onChange}
         />
       ))}
@@ -180,6 +266,7 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
       data-dials-attached={attached ? attached.def.name : ''}
     >
       <c.Row
+        path={rowPath}
         label={displayLabel}
         control={control}
         help={help}
@@ -192,20 +279,27 @@ function SlotRow({ label, slot, editors, onChange }: SlotRowProps): ReactNode {
 }
 
 function SlotEditorView({
+  path,
   slot,
   editors,
+  liveOverride,
   onChange,
   attach,
 }: {
+  path: string[]
   slot: Slot<unknown>
   editors?: Record<string, SlotEditor>
+  liveOverride?: LiveOverride
   onChange: () => void
   attach?: ReactNode
 }): ReactNode {
+  const actions = useSlotActions()
   if (slot.outType === 'number') {
     return (
       <NumberEditor
+        path={path}
         slot={slot as Slot<number>}
+        liveOverride={liveOverride}
         onChange={onChange}
         attach={attach}
       />
@@ -216,7 +310,7 @@ function SlotEditorView({
     return custom({
       value: slot.dial.value,
       set: (v) => {
-        setDial(slot, v)
+        actions.setValue(path, slot, v)
         onChange()
       },
       slot,
@@ -230,42 +324,54 @@ function SlotEditorView({
 }
 
 function NumberEditor({
+  path,
   slot,
+  liveOverride,
   onChange,
   attach,
 }: {
+  path: string[]
   slot: Slot<number>
+  liveOverride?: LiveOverride
   onChange: () => void
   attach?: ReactNode
 }): ReactNode {
   const c = usePanelComponents()
+  const actions = useSlotActions()
   const meta = slot.dial.meta
   const min = meta.min ?? 0
   const max = meta.max ?? 1
   const step = meta.step ?? (max - min) / 1000
   const scale = meta.scale
   const set = (v: number) => {
-    setDial(slot, v)
+    actions.setValue(path, slot, v)
     onChange()
   }
   // A slot opts into the smoothing control by declaring a `lerp` value
   // at construction (even `0`), mirroring how `description` gates the
   // help icon by presence. Slots that never mention lerp stay clean.
   const setLerp = (seconds: number) => {
-    meta.lerp = seconds
+    actions.setLerp(path, slot, seconds)
     onChange()
   }
   // Narrow accessors for modulation-aware sliders: whether a source is
   // attached, the slot's last sampled output, the slot's own modDepth
   // and modMode (both slot-level, present regardless of attachment).
   // The raw Slot never crosses the components contract.
-  const live = useCallback(() => slot.lastSample, [slot])
+  //
+  // A host may override the live accessor per slot — its own effective
+  // value resolved on top of the slot's modulation (e.g. a control-port
+  // wire riding the param). When it declines (returns undefined), fall
+  // back to the slot's own last-sample stash.
+  const override = liveOverride?.(path, slot)
+  const stash = useCallback(() => slot.lastSample, [slot])
+  const live = override ?? stash
   const onDepthChange = useCallback(
     (d: number) => {
-      setDepth(slot, d)
+      actions.setDepth(path, slot, d)
       onChange()
     },
-    [slot, onChange],
+    [actions, path, slot, onChange],
   )
   return (
     <div
@@ -276,13 +382,14 @@ function NumberEditor({
         : {})}
     >
       <c.Slider
+        path={path}
         value={slot.dial.value}
         min={min}
         max={max}
         step={step}
         scale={scale}
         onChange={set}
-        attached={slot.attached !== null}
+        attached={slot.attached !== null || Boolean(override)}
         live={live}
         depth={slot.modDepth}
         mode={slot.modMode}

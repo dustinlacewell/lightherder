@@ -1,8 +1,9 @@
-export { Panel } from './Panel'
-export type { PanelProps, SlotEditor } from './Panel'
+export { Panel, SlotRow } from './Panel'
+export type { PanelProps, SlotEditor, SlotRowProps, LiveOverride } from './Panel'
 
 export {
   defaultPanelComponents,
+  defaultSlotActions,
   DefaultSlider,
   DefaultNumberField,
   DefaultLerpControl,
@@ -13,6 +14,8 @@ export {
   DefaultAttachControl,
   PanelComponentsProvider,
   usePanelComponents,
+  SlotActionsProvider,
+  useSlotActions,
 } from './components'
 
 export type {
@@ -26,4 +29,6 @@ export type {
   RowProps,
   HeadingProps,
   AttachControlProps,
+  SlotActions,
+  SlotChromeProps,
 } from './components'
