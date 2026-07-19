@@ -217,6 +217,12 @@ export function Knob({
   const onDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button === 2) {
+        // A MODIFIED right-click (ctrl/shift/alt/meta) belongs to the
+        // host wrapping the knob — its own context-menu chords (MIDI
+        // learn, a port toggle, …). The knob's depth-drag / picker-tap is
+        // a PLAIN right-click only, so bail here and let the event bubble
+        // to the host's onContextMenu.
+        if (e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return
         // Right button — a depth drag, or a tap that opens the
         // associated control. Active when either gesture is wired.
         // (The context menu is suppressed via onContextMenu regardless.)
