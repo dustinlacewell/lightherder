@@ -44,7 +44,7 @@ export function useSpawn(bench: Bench): {
   spawn: (kind: NodeKind, opts: MakeOpts, sx: number, sy: number) => void;
   dropLib: (entry: LibEntry, sx: number, sy: number) => void;
 } {
-  const { prefix, strip, path } = bench;
+  const { prefix, strip, path, setNodes, bumpDoc } = bench;
   const rf = useReactFlow();
 
   /* mint the id against a synchronous read, then append functionally —
@@ -54,14 +54,22 @@ export function useSpawn(bench: Bench): {
      in principle collide on an id, but no UI flow produces that. The
      recorded op is addressed by COMPILED id (the prefixed node RF holds);
      record()'s canonicalize-only pass routes it — an { entry } scope when
-     the viewed level is a library entry, a { doc, path } otherwise. */
+     the viewed level is a library entry, a { doc, path } otherwise.
+     record() applies nothing (we applied), so the doc bump is ours:
+     without it the flat compile stays stale and the engine never meets
+     the new node — a media/draw face would blit nothing until the next
+     structural edit happened to recompile. The node lands through the
+     CONTROLLED setter (the one applyViewed's addNode uses), never
+     rf.setNodes: the store API feeds the controlled state back a render
+     late, so the bump's recompile would read a tree one node behind. */
   const land = useCallback((mint: (locals: PatchNode[]) => PatchNode): void => {
     const locals = rf.getNodes().map(n => ({ ...n, id: strip(n.id) })) as PatchNode[];
     const n = mint(locals);
     const compiled = { ...n, id: prefix + n.id };
-    rf.setNodes(ns => [...ns, compiled as BenchNode]);
+    setNodes(ns => [...ns, compiled as BenchNode]);
     record({ kind: 'addNode', scope: DOC_ROOT, node: compiled });
-  }, [rf, prefix, strip]);
+    bumpDoc();
+  }, [rf, prefix, strip, setNodes, bumpDoc]);
 
   /* a plain device lands on the viewed level. A MODULE is special: it
      mints an empty library entry named after the node and drops a
@@ -82,12 +90,13 @@ export function useSpawn(bench: Bench): {
       n.data.ref = id;
       n.data.vals = {};
       const compiled = { ...n, id: prefix + n.id };
-      rf.setNodes(ns => [...ns, compiled as BenchNode]);
+      setNodes(ns => [...ns, compiled as BenchNode]);
       record({ kind: 'addNode', scope: DOC_ROOT, node: compiled });
+      bumpDoc();
       return;
     }
     land(locals => makeNode(kind, p.x - 105, p.y - 16, locals, opts));
-  }, [rf, land, prefix, strip]);
+  }, [rf, land, prefix, strip, setNodes, bumpDoc]);
 
   /* a library entry drops as a reference — no instantiate, no media copy,
      no await. The cycle guard runs first: nesting an entry inside its own

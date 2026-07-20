@@ -18,11 +18,12 @@
    id (or null) so the UI can show the "waiting for a screen" note until
    the first one lands. */
 
+import { FX_KINDS } from '../fx';
 import { mirror, stage } from '../runtime';
 import { sessionStore } from '../session';
 
 /* the kinds with a face the preview can mirror — the bench's own set */
-const FACED = new Set<string>(['camera', 'monitor', 'mixer', 'draw', 'media']);
+const FACED = new Set<string>(['camera', 'monitor', 'mixer', 'delay', 'draw', 'media', 'webcam', ...FX_KINDS]);
 
 /** resolve the host's pin against the live mirror; adopt it when it names
     a faced node, else keep whatever the preview already shows. */

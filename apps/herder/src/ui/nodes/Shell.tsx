@@ -85,12 +85,12 @@ const PORT_TOP = 44;
 
 export interface FixedPort { kind: 'v' | 'c'; id: string; label: string; desc: string }
 
-export function Shell({ id, data, kind, fixed = [], face, headBtns, className, children }: {
+export function Shell({ id, data, kind, fixed = [], face, headBtns, className, style, children }: {
   id: string; data: NodeData; kind: NodeKind; fixed?: FixedPort[];
   /** the blitted glass, rendered first in the body — the only element
       the port stack's floating labels may overlap */
   face?: React.ReactNode;
-  headBtns?: React.ReactNode; className?: string; children?: React.ReactNode;
+  headBtns?: React.ReactNode; className?: string; style?: React.CSSProperties; children?: React.ReactNode;
 }) {
   if (import.meta.env.DEV && fixed.some(p => p.label) && !face)
     console.warn(`herder: ${kind} has labeled fixed ports but no face slot — the labels will float over its controls`);
@@ -103,7 +103,10 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
   const railed = exposed.length > 0 && labelsOn;
   const rows = fixed.length + exposed.length;
   const sig = exposed.join();
-  useEffect(() => { upd(id); }, [id, sig, upd]);
+  /* re-measure when ports OR the node's own width change — RF caches a
+     node's measured size and won't shrink it back on its own when the
+     inline width drops (e.g. a dial's modulation tree collapses) */
+  useEffect(() => { upd(id); }, [id, sig, style?.width, upd]);
 
   const togglePort = (k: string): void => {
     dispatch({ kind: 'togglePort', scope: at(), node: id, param: k, on: !data.ports?.includes(k) });
@@ -119,7 +122,7 @@ export function Shell({ id, data, kind, fixed = [], face, headBtns, className, c
   return (
     <div
       className={`dev dev-${kind}${railed ? ' railed' : ''}${className ? ' ' + className : ''}`}
-      style={rows ? { minHeight: PORT_TOP + rows * PORT_ROW } : undefined}
+      style={{ ...(rows ? { minHeight: PORT_TOP + rows * PORT_ROW } : {}), ...style }}
     >
       <header className="dev-head">
         <KindIcon kind={kind} />

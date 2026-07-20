@@ -1,7 +1,7 @@
 /* The source devices — where a picture enters from outside a loop:
-   dropped media, and the hand-painted draw surface. */
+   dropped media, a live webcam, and the hand-painted draw surface. */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
 import { PARAMS } from '../../patch';
 import { loadStoredMedia } from '../../persist';
@@ -9,58 +9,70 @@ import { dispatch, drawClear, drawCommit, drawStroke, emitEph, engineRef, gateMo
 import type { DeviceProps } from '../bench/types';
 import { Shell, useSetParam, VPort } from './Shell';
 
+/** where a dropped file OR a remote URL lands depends on what this node
+    IS, read off the mirror's effective mediaKey (the one place it's
+    authoritative — projection never carries it into the view):
+
+    · a ROOT-level node, or a ref-inner node this instance already
+      overrode — `mediaKey === id` (the compiled id). The picture lands
+      under that id; the engine already reads it there. Nothing else to do.
+
+    · a ref-inner node still on the ENTRY's default — `mediaKey` is the
+      entry-default key (`lib.<id>/<rel>`), distinct from the compiled id.
+      Two cases split on whether a default blob already exists there:
+        — none yet (a node freshly ADDED to the entry this session): this
+          load BECOMES the entry's default. Load straight into the default
+          key — every sibling instance reads it too (H7).
+        — one exists (re-loading onto a pre-existing entry node): this is an
+          instance OVERRIDE. Load under the compiled id and markMedia, so
+          compile stamps mediaKey = compiledId and only this instance
+          follows the new picture.
+
+    Shared by a dropped file and a URL — only the terminal engine call and
+    the ephemeron it emits differ, threaded through `put`. */
+async function loadInto(id: string, put: (key: string) => Promise<void>): Promise<void> {
+  /* a read-only peer must not diverge its own texture: ask the gate BEFORE
+     the side effect (the dispatch after it would block or defer anyway —
+     this just moves the refusal ahead of the effect, the same shape as the
+     paste / saveHere pre-checks). The markMedia op is a representative: the
+     gate decides by role, not op kind, and cues the read-only pill on block. */
+  if (gateMode({ kind: 'markMedia', scope: { kind: 'doc', path: [] }, node: id, rel: '', on: true }) === 'block') return;
+  const key = mirror.nodes.find(n => n.id === id)?.data.mediaKey;
+  if (key === undefined || key === id) {
+    await put(id);
+    return;
+  }
+  /* ref-inner, not yet overridden: key is the entry-default blob key */
+  const hasDefault = (await loadStoredMedia(key)) !== null;
+  if (!hasDefault) {
+    /* establish the entry default — the shared source under `key` gets
+       the picture, so this and every sibling instance show it */
+    await put(key);
+  } else {
+    await put(id);
+    dispatch({ kind: 'markMedia', scope: { kind: 'doc', path: [] }, node: id, rel: '', on: true });
+  }
+}
+
 export function MediaNode({ id, data }: DeviceProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState('');
   const faceRef = useCallback((el: HTMLDivElement | null) => setFace(id, el), [id]);
-  /* where a dropped file lands depends on what this node IS, read off the
-     mirror's effective mediaKey (the one place it's authoritative —
-     projection never carries it into the view):
-
-     · a ROOT-level node, or a ref-inner node this instance already
-       overrode — `mediaKey === id` (the compiled id). The blob lands under
-       that id; the engine already reads it there. Nothing else to do.
-
-     · a ref-inner node still on the ENTRY's default — `mediaKey` is the
-       entry-default key (`lib.<id>/<rel>`), distinct from the compiled id.
-       Two cases split on whether a default blob already exists there:
-         — none yet (a node freshly ADDED to the entry this session): this
-           drop BECOMES the entry's default. Load straight into the default
-           key — every sibling instance reads it too (H7).
-         — one exists (re-dropping on a pre-existing entry node): this is an
-           instance OVERRIDE. Load under the compiled id and markMedia, so
-           compile stamps mediaKey = compiledId and only this instance
-           follows the new file. */
-  const load = async (f: File | null | undefined): Promise<void> => {
+  const load = (f: File | null | undefined): void => {
     if (!f) return;
-    /* a read-only peer must not diverge its own texture: ask the gate BEFORE
-       loadMedia (a side effect the dispatch after it would block or defer
-       anyway — this just moves the refusal ahead of the effect, the same
-       shape as the paste / saveHere pre-checks). The markMedia op is a
-       representative: the gate decides by role, not op kind, and cues the
-       read-only pill on block. */
-    if (gateMode({ kind: 'markMedia', scope: { kind: 'doc', path: [] }, node: id, rel: '', on: true }) === 'block') return;
-    const key = mirror.nodes.find(n => n.id === id)?.data.mediaKey;
-    if (key === undefined || key === id) {
-      engineRef.current?.loadMedia(id, f)
-        .then(() => emitEph({ t: 'media', key: id, blob: f }))
-        .catch(() => { /* refused file — keep the old picture */ });
-      return;
-    }
-    /* ref-inner, not yet overridden: key is the entry-default blob key */
-    const hasDefault = (await loadStoredMedia(key)) !== null;
-    if (!hasDefault) {
-      /* establish the entry default — the shared MediaSource under `key`
-         gets the texture and the stored blob in one call, so this and
-         every sibling instance show it */
-      engineRef.current?.loadMedia(key, f)
+    void loadInto(id, key =>
+      engineRef.current!.loadMedia(key, f)
         .then(() => emitEph({ t: 'media', key, blob: f }))
-        .catch(() => { /* refused file */ });
-    } else {
-      engineRef.current?.loadMedia(id, f)
-        .then(() => emitEph({ t: 'media', key: id, blob: f }))
-        .catch(() => { /* refused file */ });
-      dispatch({ kind: 'markMedia', scope: { kind: 'doc', path: [] }, node: id, rel: '', on: true });
-    }
+        .catch(() => { /* refused file — keep the old picture */ }));
+  };
+  const loadUrl = (): void => {
+    const u = url.trim();
+    if (!u) return;
+    void loadInto(id, key =>
+      engineRef.current!.loadMediaUrl(key, u)
+        .then(() => emitEph({ t: 'mediaurl', key, url: u }))
+        .catch(() => { /* bad url / CORS-blocked — keep the old picture */ }));
+    setUrl('');
   };
   return (
     <Shell
@@ -81,6 +93,48 @@ export function MediaNode({ id, data }: DeviceProps) {
         ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }}
         onChange={e => { load(e.target.files?.[0]); e.target.value = ''; }}
       />
+      <input
+        className="nodrag media-url" type="text" placeholder="or paste a video URL…"
+        value={url} onChange={e => setUrl(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') loadUrl(); }}
+        onBlur={loadUrl}
+      />
+      <VPort dir="out" id="v:out" top={95} desc="this device's picture" />
+    </Shell>
+  );
+}
+
+/* a live camera feed — unlike media, there's nothing to persist or
+   share across a library entry (a stream isn't a file, and every peer
+   in a session has its own camera), so this node is simple: click
+   starts/stops the engine's own WebcamSource, keyed directly off this
+   node's compiled id. */
+export function WebcamNode({ id, data }: DeviceProps) {
+  const [live, setLive] = useState(() => engineRef.current?.webcamLive(id) ?? false);
+  const faceRef = useCallback((el: HTMLDivElement | null) => setFace(id, el), [id]);
+  const toggle = (): void => {
+    if (live) {
+      engineRef.current?.stopWebcam(id);
+      setLive(false);
+      return;
+    }
+    engineRef.current?.startWebcam(id)
+      .then(() => setLive(true))
+      .catch(() => { /* denied or no camera — stay off */ });
+  };
+  return (
+    <Shell
+      id={id} data={data} kind="webcam"
+      face={
+        <div
+          ref={faceRef}
+          className="face nodrag"
+          title={live ? 'click to stop the camera' : 'click to start the camera'}
+          onClick={toggle}
+        />
+      }
+    >
+      <div className="hint">{live ? 'click to stop' : 'click to start the camera'}</div>
       <VPort dir="out" id="v:out" top={95} desc="this device's picture" />
     </Shell>
   );

@@ -7,6 +7,7 @@ import {
   read,
   sampleSlot,
   setDepth,
+  setGlide,
   setMode,
   typedDial,
   type ModMode,
@@ -343,26 +344,29 @@ describe('sampleSlot()', () => {
   })
 })
 
-describe('meta.lerp smoothing', () => {
-  it('snaps when lerp is unset', () => {
+describe('glide smoothing', () => {
+  it('snaps by default (glide is 0)', () => {
     const s = dial(0)
     s.dial.value = 10
     expect(sampleSlot(s, { dt: 1 })).toBe(10)
   })
 
-  it('snaps when lerp is 0', () => {
-    const s = dial(0, { lerp: 0 })
+  it('snaps when glide is explicitly 0', () => {
+    const s = dial(0)
+    setGlide(s, 0)
     s.dial.value = 10
     expect(sampleSlot(s, { dt: 1 })).toBe(10)
   })
 
   it('first sample seeds to the target (no ease from zero)', () => {
-    const s = dial(5, { lerp: 0.1 })
+    const s = dial(5)
+    setGlide(s, 0.1)
     expect(sampleSlot(s, { dt: 1 / 60 })).toBe(5)
   })
 
   it('eases toward a moved target over subsequent samples', () => {
-    const s = dial(0, { lerp: 0.5 })
+    const s = dial(0)
+    setGlide(s, 0.5)
     expect(sampleSlot(s, { dt: 0.1 })).toBe(0) // seed
     s.dial.value = 1
     const a = sampleSlot(s, { dt: 0.1 })
@@ -374,7 +378,8 @@ describe('meta.lerp smoothing', () => {
   })
 
   it('converges to the target as time accumulates', () => {
-    const s = dial(0, { lerp: 0.1 })
+    const s = dial(0)
+    setGlide(s, 0.1)
     sampleSlot(s, { dt: 0.1 }) // seed at 0
     s.dial.value = 100
     for (let i = 0; i < 200; i++) sampleSlot(s, { dt: 0.1 })
@@ -382,7 +387,8 @@ describe('meta.lerp smoothing', () => {
   })
 
   it('matches the one-pole step exactly for a known dt/tau', () => {
-    const s = dial(0, { lerp: 1 })
+    const s = dial(0)
+    setGlide(s, 1)
     sampleSlot(s, { dt: 1 }) // seed at 0
     s.dial.value = 10
     const alpha = 1 - Math.exp(-1 / 1)
@@ -390,7 +396,8 @@ describe('meta.lerp smoothing', () => {
   })
 
   it('defaults dt to 1/60 when ctx has none', () => {
-    const s = dial(0, { lerp: 1 })
+    const s = dial(0)
+    setGlide(s, 1)
     sampleSlot(s, {}) // seed
     s.dial.value = 1
     const alpha = 1 - Math.exp(-(1 / 60) / 1)
@@ -398,21 +405,55 @@ describe('meta.lerp smoothing', () => {
   })
 
   it('does not smooth non-numeric dials', () => {
-    const s = typedDial<string>('str', 'a', { lerp: 0.5 })
+    const s = typedDial<string>('str', 'a')
+    setGlide(s, 0.5)
     s.dial.value = 'b'
     expect(sampleSlot(s, { dt: 1 })).toBe('b')
   })
 
-  it('applies to the base while a source is attached — modulation adds after', () => {
-    const s = dial(0, { lerp: 1 })
-    sampleSlot(s, { dt: 1 }) // seed at 0
+  it('setGlide clamps negatives to 0', () => {
+    const s = dial(0)
+    setGlide(s, -3)
+    expect(s.glide).toBe(0)
+  })
+
+  it('glide edits never touch the shared meta', () => {
+    // meta is code-owned and shared by reference across clones — glide
+    // is slot STATE, so setting it must leave the meta object alone.
+    const meta = { min: 0, max: 1 }
+    const s = dial(0, meta)
+    setGlide(s, 2)
+    expect(s.glide).toBe(2)
+    expect(Object.keys(s.dial.meta)).toEqual(['min', 'max'])
+  })
+
+  it('smooths the COMBINED signal — modulation is inside the glide', () => {
+    const s = dial(0)
+    setGlide(s, 1)
+    sampleSlot(s, { dt: 1 }) // seed _glideY at 0
     attachAt(s, signal(1), 0.5)
-    // Target unchanged → base stays 0; out = 0 + 0.5·1.
-    expect(sampleSlot(s, { dt: 1 })).toBeCloseTo(0.5)
-    s.dial.value = 10
     const alpha = 1 - Math.exp(-1 / 1)
-    // Smoothed base eases toward 10; modulation rides on top.
-    expect(sampleSlot(s, { dt: 1 })).toBeCloseTo(10 * alpha + 0.5, 12)
+    // Combined target = base(0) + 0.5·1 = 0.5. Glide eases toward it
+    // from the seed (0), so the FIRST modulated sample is partway, not
+    // the full 0.5 — the source is inside the filter, not added after.
+    const a = 0.5 * alpha
+    expect(sampleSlot(s, { dt: 1 })).toBeCloseTo(a, 12)
+    s.dial.value = 10
+    // New combined target = 10 + 0.5 = 10.5; ease from the prior output.
+    expect(sampleSlot(s, { dt: 1 })).toBeCloseTo(a + (10.5 - a) * alpha, 12)
+  })
+
+  it('slews a fast source: a heavy glide low-passes modulation', () => {
+    // A big instantaneous modulation swing, under a heavy glide, comes
+    // out attenuated on the first sample rather than jumping the full
+    // excursion — the point of putting glide after the combine.
+    const s = dial(0)
+    setGlide(s, 1)
+    sampleSlot(s, { dt: 0.05 }) // seed at 0
+    attachAt(s, signal(1), 1) // combined target jumps to 1
+    const first = sampleSlot(s, { dt: 0.05 })
+    expect(first).toBeGreaterThan(0)
+    expect(first).toBeLessThan(1) // did NOT snap to the full swing
   })
 })
 

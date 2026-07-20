@@ -12,7 +12,7 @@
 
 import { createRoot } from 'react-dom/client';
 import './viewer.css';
-import { bootGL } from '../gl/context';
+import { bootGL } from '../engine/context';
 import { Engine } from '../engine';
 import { engineRef } from '../runtime';
 import { installViewerApplier } from './applier';

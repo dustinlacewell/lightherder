@@ -4,7 +4,8 @@
    touch a storage API directly. */
 
 export { savePatch, loadPatch } from './patchStore';
-export { storeMedia, loadStoredMedia, copyStoredMedia, dropStoredMediaUnder, listStoredMedia } from './mediaStore';
+export { storeMedia, loadStoredMedia, copyStoredMedia, dropStoredMedia, dropStoredMediaUnder, listStoredMedia } from './mediaStore';
+export { storeMediaUrl, loadStoredMediaUrl, dropStoredMediaUrl } from './mediaUrlStore';
 export { libStore, saveLibraryNow, reloadLibrary, dropEntryMedia, type LibEntry } from './libraryStore';
 export {
   stashDocs, restoreDocs, hasStash, dropStash,

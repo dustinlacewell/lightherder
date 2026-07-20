@@ -1,6 +1,6 @@
 /* Remote ephemera — the performance transients a session relays but the
    document never keeps: sparks, taps, holds, draw strokes, freeze, step,
-   clear, pin (media blobs ride the blob channel, S4).
+   clear, pin, remote media URLs (media blobs ride the blob channel, S4).
 
    Two directions, one file:
 
@@ -19,7 +19,7 @@
    `media` blob is stubbed until S4 brings the blob channel semantics. */
 
 import {
-  clearAllScreens, drawClear, drawCommit, drawStroke, holdSwitch, muted,
+  clearAllScreens, drawClear, drawCommit, drawStroke, engineRef, holdSwitch, muted,
   releaseSwitch, setFrozen, spark, stepOnce, tap, watchEph, type Eph,
 } from '../runtime';
 import { selfId } from './room';
@@ -140,6 +140,8 @@ function apply(e: Eph): void {
          blob goes on the blob channel (installEphSend strips it, the host/
          peer blob handlers store + loadMedia it, S6). Kept for exhaustiveness. */
       case 'media': return;
+      /* a URL is a string, not a blob — it rides the normal eph batch */
+      case 'mediaurl': void engineRef.current?.loadMediaUrl(e.key, e.url); return;
     }
   });
 }

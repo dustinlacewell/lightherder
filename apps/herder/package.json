@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ldlework/dials": "workspace:*",
+    "@ldlework/gl": "workspace:*",
     "@ldlework/phosphor": "workspace:*",
     "@ldlework/phosphor-dials": "workspace:*",
     "@xyflow/react": "^12.11.2",

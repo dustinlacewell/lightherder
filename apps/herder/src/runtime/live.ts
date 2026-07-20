@@ -46,3 +46,22 @@ export function watchLive(target: string, cb: () => void): () => void {
   set.add(cb);
   return () => { set!.delete(cb); if (!set!.size) liveWatchers.delete(target); };
 }
+
+/* ---- the tick pulse ---------------------------------------------------
+   Some followers track engine-resolved values that live outside the
+   live map — the xypad's lag puck reads its slot's own lastSample.
+   Those values only move when the engine ticks, so followers wake here,
+   once per tick, instead of each running a rAF poll of its own. */
+
+const tickWatchers = new Set<() => void>();
+
+/** engine only: end of tick — wake the per-tick followers */
+export function notifyTick(): void {
+  for (const cb of tickWatchers) cb();
+}
+
+/** subscribe to the engine's tick pulse; returns an unsubscribe */
+export function watchTick(cb: () => void): () => void {
+  tickWatchers.add(cb);
+  return () => { tickWatchers.delete(cb); };
+}

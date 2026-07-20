@@ -27,7 +27,7 @@ export default meta
 const synthDials: Dials = {
   freq: dial(600, { min: 50, max: 3000, scale: 'log', description: 'Oscillator pitch, in Hz.' }),
   amp: dial(0.5, { min: 0, max: 1, description: 'Output level, 0 to full.' }),
-  detune: dial(0, { min: -100, max: 100, lerp: 0, description: 'Pitch offset in cents.' }),
+  detune: dial(0, { min: -100, max: 100, unit: '¢', description: 'Pitch offset in cents.' }),
 }
 
 export const Default: StoryObj<typeof Panel> = {

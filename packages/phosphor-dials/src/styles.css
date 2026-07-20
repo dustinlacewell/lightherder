@@ -257,9 +257,10 @@
 
 /*
  * The control row hosts whatever the slot type renders. For numeric
- * slots that's a Knob + NumberField (+ ArcGauge lerp control when the
- * slot declares `lerp`) in a single line — a 1fr grid column for the
- * knob, auto-width columns for the rest.
+ * slots that's a Knob + NumberField in a single line — a 1fr grid
+ * column for the knob, auto-width columns for the rest. Glide is shown
+ * as a thin bar under the knob face (the Knob's own `lerp` readout),
+ * not a separate control in this row.
  */
 /*
  * Control area — a relative positioning context so the attach picker

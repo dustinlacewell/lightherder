@@ -3,6 +3,8 @@
    Pure data; the engine resolves effective values, the UI draws them. */
 
 import { dial, type Dials, type Slot } from '@ldlework/dials';
+import { f2, f3, f4, fdeg, fhz, fint, fmul, fpx, fsec, fsig } from './fmt';
+import { FX } from '../fx';
 import type { NodeKind } from './graph';
 
 export interface ParamDef {
@@ -21,6 +23,20 @@ export interface ParamDef {
   cmax?: number;
   /** control polarity override — otherwise inferred from the shape */
   polarity?: 'uni' | 'bi';
+  /** ratio params (zoom, radius): a riding signal multiplies instead
+      of adds — the throw is symmetric in log space, so full up reaches
+      max and full down reaches min from a centered knob */
+  scale?: 'log';
+  /** the knob offers the glide affordance (bar + shift+right-drag) —
+      only params whose signal should slew (a dial's val; the actual
+      glide seconds live on the slot, mirrored from the sibling `lerp`
+      param by StampBank) */
+  glidable?: boolean;
+  /** the knob offers per-knob source modulation (attach picker +
+      depth right-drag) — ONLY the dial's own val. Node params are
+      mundane knobs: they modulate indirectly, by exposing the param
+      as an input port and wiring a modulated Dial node into it. */
+  modulatable?: boolean;
 }
 
 /* uni: the param rests at its floor (def === min), so a control signal
@@ -31,17 +47,6 @@ export interface ParamDef {
 export const polarityOf = (def: ParamDef): 'uni' | 'bi' =>
   def.polarity ?? (def.def === def.min ? 'uni' : 'bi');
 
-const RAD = Math.PI / 180;
-const fdeg = (v: number) => (v / RAD).toFixed(0) + '°';
-const fmul = (v: number) => '×' + v.toFixed(3);
-const fpx = (v: number) => v.toFixed(2) + 'px';
-const f4 = (v: number) => v.toFixed(4);
-const f3 = (v: number) => v.toFixed(3);
-const f2 = (v: number) => v.toFixed(2);
-const fsig = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(3);
-const fint = (v: number) => String(Math.round(v));
-const fhz = (v: number) => v.toFixed(0) + '/s';
-const fsec = (v: number) => v.toFixed(2) + 's';
 
 export const RES_STEPS: [number, number][] =
   [[960, 540], [1280, 720], [1920, 1080], [2560, 1440], [3840, 2160]];
@@ -52,7 +57,6 @@ const MONITOR_PARAMS: Record<string, ParamDef> = {
   contrast: { label: 'Contrast', min: 0.60, max: 2.20, def: 1.0, fmt: f3, desc: 'Contrast about mid-gray. The loop-gain knob: above ~1 the feedback stays expansive and keeps evolving, below it the loop contracts and settles. ×1 = untouched.' },
   sat:      { label: 'Sat',      min: 0, max: 2, def: 1.0, fmt: f2, desc: 'Color saturation. ×1 leaves color alone; below 1 drains toward gray, above 1 pumps the hue drift the loop accumulates.' },
   hue:      { label: 'Hue',      min: 0, max: 2 * Math.PI, def: 0, fmt: fdeg, periodic: true, desc: 'Hue rotation, applied every pass. A nonzero angle sends color cycling around the wheel each lap — the traveling rainbow. 0° = no shift. Rest-at-zero, so a dial on the HUE port re-ranges to 0…+1 and its full throw sweeps the whole wheel.' },
-  delay:    { label: 'Delay',    min: 0, max: 5, def: 0, step: 1, fmt: fint, desc: 'Frames of buffering in this device’s path. 0 = an analog wire — a CRT scans the signal out as it arrives, so this device adds NO frame to the lap (the camera still charges its one; a camera-less 0-delay cycle falls back to 1). 1 = one digital hop; each extra frame is a converter box — it stretches the LAP, so stepped copies land farther apart. Shorter laps mean fewer slots cycling independently — delay 0 kills the alternating-frame strobe.' },
   persist:  { label: 'Persist',  min: 0, max: 0.9, def: 0, fmt: f2, desc: 'Phosphor persistence — how much of last frame this screen holds onto. The trails. 0 = instant.' },
 };
 
@@ -71,6 +75,18 @@ const CAMERA_PARAMS: Record<string, ParamDef> = {
   bleed:    { label: 'Bleed',    min: 0, max: 0.10, def: 0, fmt: f3, desc: 'Sensor channel crosstalk. Without it each RGB channel loops independently and rails to 0 or 1, collapsing the palette to the cube corners. High values drain color.' },
   knee:     { label: 'Knee',     min: 0, max: 1, def: 0, fmt: f2, desc: 'Highlight knee — how softly values above 0.8 roll off instead of clipping. Soft keeps color alive where a loop over-drives; 0 = hard clip (identity for in-range values).' },
   grain:    { label: 'Grain',    min: 0, max: 0.05, def: 0, fmt: f3, desc: 'Sensor grain injected each frame — the color seed a loop amplifies. A little keeps a dark loop alive; too much drowns it in static.' },
+};
+
+/** the delay device's longest reach, in frames — its buffer grows
+    lazily to whatever the knob asks for, up to this */
+export const DELAY_MAX = 60;
+
+/* the delay device: a frame store. It records its input every tick and
+   plays back the one from N ticks ago — real buffering against ANY
+   source, unlike a monitor's delay knob, which can only tap a
+   ring-bearing producer's history. */
+const DELAY_PARAMS: Record<string, ParamDef> = {
+  frames: { label: 'Frames', min: 0, max: DELAY_MAX, def: 1, step: 1, fmt: fint, desc: 'How many frames late the output runs. 0 = a straight wire; each step holds the picture one video frame longer. Composite against the live signal for echo and motion-difference work.' },
 };
 
 /** the mixer's composite modes, in wire order — the stored `mode` value
@@ -101,14 +117,15 @@ const DRAW_PARAMS: Record<string, ParamDef> = {
 };
 
 const DIAL_PARAMS: Record<string, ParamDef> = {
-  val:  { label: 'Value', min: -1, max: 1, def: 0, fmt: fsig, desc: 'The control signal this dial sends down its wire: −1…+1, 0 at rest. On a camera’s ROT port that’s ±180°; on ZOOM it rides the knob ±0.65.' },
+  val:  { label: 'Value', min: -1, max: 1, def: 0, fmt: fsig, glidable: true, modulatable: true, desc: 'The control signal this dial sends down its wire: −1…+1, 0 at rest. On a camera’s ROT port that’s ±180°; on ZOOM it rides the knob ±0.65.' },
   lerp: { label: 'Lerp', min: 0, max: 3, def: 0, fmt: fsec, desc: 'How the signal chases the knob — the time constant of the glide, in seconds. 0 = wired direct: the wire carries the knob’s position instantly. Turn it up and a flick or a MIDI jump arrives down the wire as a smooth sweep instead of a step.' },
 };
 
 const XYPAD_PARAMS: Record<string, ParamDef> = {
-  x:    { label: 'X', min: -1, max: 1, def: 0, fmt: fsig, desc: 'The control signal this pad sends down its X wire: −1…+1, 0 at rest (center).' },
-  y:    { label: 'Y', min: -1, max: 1, def: 0, fmt: fsig, desc: 'The control signal this pad sends down its Y wire: −1…+1, 0 at rest (center).' },
-  lerp: { label: 'Lerp', min: 0, max: 3, def: 0, fmt: fsec, desc: 'How both signals chase the puck — the time constant of the glide, in seconds, shared by X and Y. 0 = wired direct.' },
+  x:     { label: 'X', min: -1, max: 1, def: 0, fmt: fsig, desc: 'The control signal this pad sends down its X wire: −1…+1, 0 at rest (center).' },
+  y:     { label: 'Y', min: -1, max: 1, def: 0, fmt: fsig, desc: 'The control signal this pad sends down its Y wire: −1…+1, 0 at rest (center).' },
+  lerpx: { label: 'Lerp X', min: 0, max: 3, def: 0, fmt: fsec, desc: 'How the X signal chases the puck — the time constant of the X glide, in seconds. 0 = wired direct. Independent of Y.' },
+  lerpy: { label: 'Lerp Y', min: 0, max: 3, def: 0, fmt: fsec, desc: 'How the Y signal chases the puck — the time constant of the Y glide, in seconds. 0 = wired direct. Independent of X.' },
 };
 
 /* the val knob's face when everything the dial feeds is unipolar —
@@ -125,34 +142,46 @@ export const DIAL_VAL_UNI: ParamDef = {
 export const XYPAD_X_UNI: ParamDef = { ...XYPAD_PARAMS.x, min: 0, desc: 'The control signal this pad sends down its X wire: 0…+1, 0 at rest. Every port X feeds is unipolar, so it only pushes up.' };
 export const XYPAD_Y_UNI: ParamDef = { ...XYPAD_PARAMS.y, min: 0, desc: 'The control signal this pad sends down its Y wire: 0…+1, 0 at rest. Every port Y feeds is unipolar, so it only pushes up.' };
 
+const FX_PARAMS = Object.fromEntries(
+  Object.entries(FX).map(([k, d]) => [k, d.params]),
+) as { [K in keyof typeof FX]: Record<string, ParamDef> };
+
 export const PARAMS: Record<NodeKind, Record<string, ParamDef>> = {
   media: {},
+  webcam: {},
   draw: DRAW_PARAMS,
   camera: CAMERA_PARAMS,
   monitor: MONITOR_PARAMS,
   mixer: { mode: { label: 'Mode', min: 0, max: MIXER_MODES.length - 1, def: 0, step: 1, fmt: v => MIXER_MODES[Math.round(v)]?.name ?? 'MIX', desc: 'How A and B composite — the MIX glass, the luma KEY, and the blend set (ADD, DIFF, MULT, SCREEN, OVERLAY, DODGE, BURN).' }, ...MIXER_PARAMS },
+  delay: DELAY_PARAMS,
   switch: {},
   dial: DIAL_PARAMS,
   xypad: XYPAD_PARAMS,
   in: {},
   out: {},
   module: {},
-};
+  ...FX_PARAMS,
+} satisfies Record<NodeKind, Record<string, ParamDef>>;
 
 /* the knobs each kind shows in its drawer (mode has its own dropdown) */
 /* draw's hue/size are its own sliders, not drawer knobs */
 export const DRAWER: Record<NodeKind, string[]> = {
   media: [],
+  webcam: [],
   draw: [],
   camera: Object.keys(CAMERA_PARAMS),
   monitor: Object.keys(MONITOR_PARAMS),
   mixer: Object.keys(MIXER_PARAMS),
+  delay: Object.keys(DELAY_PARAMS),
   switch: [],
   dial: [],
   xypad: [],
   in: [],
   out: [],
   module: [],
+  ...(Object.fromEntries(
+    Object.entries(FX).map(([k, d]) => [k, Object.keys(d.params)]),
+  ) as { [K in keyof typeof FX]: string[] }),
 };
 
 /* the transport globals — the video standard and the loop resolution */
@@ -177,13 +206,15 @@ export function defaultGlobals(): Record<string, number> {
    ParamDef once the value lives on a Slot. `polarity` is resolved (never
    inferred at read time); `fmt` rides along so the UI can format without
    re-consulting PARAMS. Discrete params (mode/res/video, delay/size…)
-   set `step`; the panel shows no attach picker where modulation makes no
-   sense, but the shape stays uniform. */
+   set `step`. Per-knob modulation is opt-in (`ParamDef.modulatable`,
+   the dial's val only), so the panel shows no attach picker anywhere
+   else — but the shape stays uniform. */
 export interface ParamHints extends Record<string, unknown> {
   periodic: boolean;
   cmin?: number;
   cmax?: number;
   polarity: 'uni' | 'bi';
+  scale?: 'log';
   fmt: (v: number) => string;
 }
 
@@ -194,6 +225,7 @@ export function paramHints(def: ParamDef): ParamHints {
     ...(def.cmin !== undefined ? { cmin: def.cmin } : {}),
     ...(def.cmax !== undefined ? { cmax: def.cmax } : {}),
     polarity: polarityOf(def),
+    ...(def.scale !== undefined ? { scale: def.scale } : {}),
     fmt: def.fmt,
   };
 }
@@ -206,10 +238,14 @@ export function slotFor(def: ParamDef): Slot<number> {
     label: def.label,
     min: def.min,
     max: def.max,
-    /* a stepped param is discrete (delay, size, mode, res, video) —
-       a modulation source riding it makes no sense, so it renders as a
-       plain phosphor knob with no attach glyph */
-    ...(def.step !== undefined ? { step: def.step, modulatable: false } : {}),
+    ...(def.step !== undefined ? { step: def.step } : {}),
+    /* per-knob modulation is opt-in (the dial's val, nothing else) —
+       every other param is a mundane knob, and dials drops any stale
+       snapshot attachment a pre-policy patch still carries */
+    ...(def.modulatable ? {} : { modulatable: false }),
+    /* the knob's readout formats through the param's own fmt */
+    format: def.fmt,
+    ...(def.glidable ? { glidable: true } : {}),
     description: def.desc,
     hints: paramHints(def),
   });

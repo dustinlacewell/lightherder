@@ -229,13 +229,13 @@
      bloom itself, derived from the screen body tints (which
      themselves chain off --display-color). The additive linear at
      top-left is the ambient lift (slightly brighter where overhead
-     room light grazes the upper-left of the back panel) and uses a
-     stronger display-color blend so the chrome around the seam reads
-     as catching the emitted light. */
+     room light grazes the upper-left of the back panel) — kept
+     subtle so it reads as a hint of glass, not a glare washing out
+     the corner. */
   --spill:
     linear-gradient(
       135deg,
-      color-mix(in oklch, var(--display-color) 22%, transparent) 0%,
+      color-mix(in oklch, var(--display-color) 10%, transparent) 0%,
       transparent 18%
     ),
     radial-gradient(

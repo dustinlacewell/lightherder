@@ -75,6 +75,9 @@ importers:
       '@ldlework/dials':
         specifier: workspace:*
         version: link:../../packages/dials
+      '@ldlework/gl':
+        specifier: workspace:*
+        version: link:../../packages/gl
       '@ldlework/phosphor':
         specifier: workspace:*
         version: link:../../packages/phosphor

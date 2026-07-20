@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dial, setDial, typedDial } from '../src'
+import { attachFrom, cloneSlot, dial, rebaseSlot, setDial, sine, typedDial } from '../src'
 
 describe('dial()', () => {
   it('creates a numeric slot with type tag "number"', () => {
@@ -55,5 +55,30 @@ describe('setDial()', () => {
     const s = typedDial<string>('text', 'hi')
     setDial(s, 'bye')
     expect(s.dial.value).toBe('bye')
+  })
+})
+
+describe('rebaseSlot()', () => {
+  it('makes the current value the reset target', () => {
+    const s = dial(3, { min: 0, max: 10 })
+    setDial(s, 7)
+    expect(s.dial.initial).toBe(3)
+    rebaseSlot(s)
+    expect(s.dial.initial).toBe(7)
+  })
+
+  it('recurses through an attached source\'s sub-slots', () => {
+    const s = dial(0, { min: -1, max: 1 })
+    const src = attachFrom(s, sine)
+    src.params.freq.dial.value = 4.2
+    rebaseSlot(s)
+    expect(src.params.freq.dial.initial).toBe(4.2)
+  })
+
+  it('survives cloning — a clone of a rebased slot keeps the new home', () => {
+    const s = dial(3, { min: 0, max: 10 })
+    setDial(s, 7)
+    rebaseSlot(s)
+    expect(cloneSlot(s).dial.initial).toBe(7)
   })
 })

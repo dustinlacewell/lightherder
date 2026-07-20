@@ -3,7 +3,7 @@
    loops read. The picture survives reloads through the same store the
    media device uses (one PNG per node id). */
 
-import type { GLC } from '../../gl/context';
+import type { GLC } from '../context';
 import { loadStoredMedia, storeMedia } from '../../persist';
 
 const W = 960, H = 540;

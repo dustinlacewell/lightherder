@@ -44,28 +44,42 @@ export interface DialMeta<T> {
    */
   scale?: 'linear' | 'log'
   /**
-   * Smoothing time constant in seconds. When set (and `> 0`), the
-   * slot's *base* value is one-pole lowpassed toward the dial's target
-   * value instead of snapping. So a user drag or a preset load eases
-   * in over roughly `lerp` seconds rather than jumping. `undefined`/`0`
-   * means snap (the default). Only meaningful for `T = number`.
-   *
-   * This smooths the base term; while a source is attached, modulation
-   * (`depth·signal`) adds on top of the smoothed base (smooth a
-   * source's own signal with the `smooth` source instead). Reads
-   * `ctx.dt`, matching the stdlib time convention.
+   * Whether an editor offers the glide affordance (the bar under the
+   * knob, the shift+right-drag gesture, the default bundle's glide
+   * field) for this slot. The glide *state* lives on the slot
+   * (`Slot.glide`) and the sampler honors it regardless — this flag
+   * only gates the UI, exactly as `modulatable` gates the attach
+   * picker. Default `false`: glide integrates `ctx.dt`, so it only
+   * makes sense on surfaces sampled against advancing time — a slot
+   * opts in rather than every purely user-driven dial growing a time
+   * control.
    */
-  lerp?: number
+  glidable?: boolean
+  /**
+   * Unit suffix for readouts ('Hz', 's', 'px'). Display-only; editors
+   * append it to the value they render. Only meaningful for `T = number`.
+   */
+  unit?: string
+  /**
+   * Readout formatter — overrides an editor's built-in value display.
+   * Receives the raw value. Display-only, code-owned like the rest of
+   * the meta. Only meaningful for `T = number`.
+   */
+  format?: (v: number) => string
   /** Hint for the panel — e.g. 'oklch' for a color dial. */
   space?: string
   /**
    * Whether this slot may have a source attached. `true`/`undefined`
    * (the default) — the panel offers the attach control. `false` — the
-   * panel suppresses it entirely: no glyph, no picker, no candidates.
-   * The slot still renders its editor and still samples (base only), so
-   * a non-modulatable numeric slot looks exactly like a modulatable one
-   * minus the attach affordance. For discrete or transport-like values
-   * where modulation is nonsensical (a resolution, a frame count).
+   * slot does not modulate: the panel suppresses the attach control
+   * and depth gesture entirely, and `fromJSON` drops a snapshot's
+   * attachment onto it (stale state can't force a modulation the code
+   * says can't exist). The slot still renders its editor and still
+   * samples (base only), so a non-modulatable numeric slot looks
+   * exactly like a modulatable one minus the modulation affordances.
+   * For discrete or transport-like values where modulation is
+   * nonsensical (a resolution, a frame count), or for hosts that route
+   * modulation through their own layer instead of per-knob sources.
    */
   modulatable?: boolean
   /**
@@ -89,7 +103,9 @@ export interface Dial<T> {
   /**
    * The construction-time value — the dial's code-defined home.
    * Editors use it as the reset target (double-click / Home); loading
-   * a snapshot changes `value`, never this.
+   * a snapshot changes `value`, never this. `rebaseSlot` is the one
+   * sanctioned way to move it — for hosts that clone a live prototype
+   * tree and want the prototype's current state as the clone's home.
    */
   readonly initial: T
   readonly meta: DialMeta<T>
@@ -214,6 +230,18 @@ export interface Slot<T> {
    */
   modMode: ModMode
   /**
+   * Glide time constant in seconds — user-tunable slot STATE, like
+   * `modDepth`/`modMode` (not metadata: it's edited by gesture,
+   * serialized, and copied by `cloneSlot`). When `> 0`, the slot's
+   * COMBINED output (base plus any modulation) is one-pole lowpassed
+   * toward its instantaneous target instead of snapping — a slew
+   * limiter on the whole signal, so a fast source through a heavy
+   * glide arrives as a gentle sweep. `0` means snap (the default).
+   * Reads `ctx.dt`, matching the stdlib time convention. Only
+   * meaningful for `T = number`.
+   */
+  glide: number
+  /**
    * The value this slot resolved to on its most recent sample — the
    * combined output (`base + depth·signal`) while modulated — written
    * by the sampler every time the slot is pulled (attached or not),
@@ -224,12 +252,22 @@ export interface Slot<T> {
    */
   lastSample?: T
   /**
-   * @internal — one-pole filter memory for `meta.lerp` smoothing. Holds
-   * the last emitted (smoothed) value of the dial branch. `NaN` until
-   * the first sample, at which point it initializes to the dial's
-   * target so smoothing eases from the current value, not from zero.
+   * View state: whether this slot's attached-source sub-panel is folded
+   * away in an editor. Carried on the slot — like `lastSample` — so it
+   * survives remounts and so any layer (e.g. a host computing how wide
+   * an expanded modulation tree renders) can observe it without asking
+   * the component tree. Written by the editor's fold toggle (`SlotRow`),
+   * never by the sampler; not serialized; `undefined` means expanded.
    */
-  _lerpY?: number
+  folded?: boolean
+  /**
+   * @internal — one-pole filter memory for `glide` smoothing. Holds
+   * the last emitted (smoothed) COMBINED output — baseline plus any
+   * modulation — since glide slews the whole signal. Unset until the
+   * first sample, at which point it initializes to the current combined
+   * target so smoothing eases from where the signal is, not from zero.
+   */
+  _glideY?: number
 }
 
 /** The type a slot resolves to. */

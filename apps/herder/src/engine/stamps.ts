@@ -4,7 +4,7 @@
    whose knob moved last drives it (last write wins). That tiebreak
    needs one fact per dial axis: the tick its knob last moved. This is
    all that survives of the old engine-side DialBank; the GLIDE it used
-   to do now lives on the slot itself (`DialMeta.lerp`, applied by the
+   to do now lives on the slot itself (`Slot.glide`, applied by the
    dials sampler in sim-time), so a dial's wire carries its fully
    resolved — glided AND modulated — output straight off `lastSample`.
 
@@ -15,6 +15,10 @@ import { type Dials, type Slot } from '@ldlework/dials';
 import type { PatchNode } from '../patch';
 
 const DIAL_AXES: Record<string, string[]> = { dial: ['val'], xypad: ['x', 'y'] };
+
+/* the lerp param that glides each axis — a dial's one axis rides the
+   shared `lerp`; an XY pad's axes each ride their own (independent slew) */
+const AXIS_LERP: Record<string, string> = { val: 'lerp', x: 'lerpx', y: 'lerpy' };
 
 /** the axis slot value a stamp watches — the user's dial position (not
     the sampled output; a stamp fires on a KNOB move, not on modulation
@@ -30,17 +34,19 @@ export class StampBank {
 
   /** watch every dial/xypad axis; stamp any whose knob moved this tick.
       Also mirrors each axis's own `lerp` param into the axis slot's
-      `meta.lerp` so the sampler glides the base in sim-time — the single
-      owner of the one-pole the old DialBank used to run. */
+      `glide` (slot STATE, like modDepth — never the shared meta) so the
+      sampler glides the combined signal in sim-time — the single owner
+      of the one-pole the old DialBank used to run. An XY pad's axes glide
+      independently (lerpx / lerpy); a dial's one axis rides `lerp`. */
   step(nodes: PatchNode[], ticks: number): void {
     for (const n of nodes) {
       const axes = DIAL_AXES[n.type];
       if (!axes) continue;
-      const tau = axisValue(n.data.slots, 'lerp');
       for (const axis of axes) {
         const s = n.data.slots[axis] as Slot<number> | undefined;
         if (!s) continue;
-        if (typeof tau === 'number') s.dial.meta.lerp = tau;
+        const tau = axisValue(n.data.slots, AXIS_LERP[axis]);
+        if (typeof tau === 'number') s.glide = tau;
         const key = `${n.id}:${axis}`;
         const target = s.dial.value;
         if (this.prev.get(key) !== target) {

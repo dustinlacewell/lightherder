@@ -11,8 +11,10 @@ import { emitEph, stage } from '../../runtime';
 import { sessionStore } from '../../session';
 import type { BenchNode } from '../bench/types';
 
+import { FX_KINDS } from '../../fx';
+
 /* the kinds with a face the preview monitor can mirror */
-const FACED = new Set<string>(['camera', 'monitor', 'mixer', 'media', 'draw']);
+const FACED = new Set<string>(['camera', 'monitor', 'mixer', 'delay', 'media', 'draw', 'webcam', ...FX_KINDS]);
 
 export interface PreviewPin {
   /** the node whose face the preview mirrors right now, if any */

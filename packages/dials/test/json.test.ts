@@ -10,6 +10,7 @@ import {
   registerSource,
   registerStdlib,
   setDepth,
+  setGlide,
   setMode,
   toJSON,
   sine,
@@ -24,19 +25,20 @@ afterEach(() => {
 })
 
 describe('toJSON()', () => {
-  it('snapshots a bare dials object with its slot-level depth and mode', () => {
+  it('snapshots a bare dials object with its slot-level depth, mode, and glide', () => {
     const d = { a: dial(1), b: dial(2, { min: 0, max: 10 }) }
     expect(toJSON(d)).toEqual({
-      a: { value: 1, depth: 0, mode: 'center' },
-      b: { value: 2, depth: 0, mode: 'center' },
+      a: { value: 1, depth: 0, mode: 'center', glide: 0 },
+      b: { value: 2, depth: 0, mode: 'center', glide: 0 },
     })
   })
 
-  it('snapshots depth and mode for an armed-but-unattached slot', () => {
+  it('snapshots depth, mode, and glide for an armed-but-unattached slot', () => {
     const d = { freq: dial(600) }
     setDepth(d.freq, 0.3)
     setMode(d.freq, 'up')
-    expect(toJSON(d).freq).toEqual({ value: 600, depth: 0.3, mode: 'up' })
+    setGlide(d.freq, 1.5)
+    expect(toJSON(d).freq).toEqual({ value: 600, depth: 0.3, mode: 'up', glide: 1.5 })
   })
 
   it('snapshots an attached source with slot depth/mode and sub-slot values', () => {
@@ -51,11 +53,12 @@ describe('toJSON()', () => {
         value: 600,
         depth: 0.4,
         mode: 'center',
+        glide: 0,
         attached: {
           name: 'sine',
           params: {
-            freq: { value: 0.3, depth: 0, mode: 'center' },
-            phase: { value: 0, depth: 0, mode: 'center' },
+            freq: { value: 0.3, depth: 0, mode: 'center', glide: 0 },
+            phase: { value: 0, depth: 0, mode: 'center', glide: 0 },
           },
         },
       },
@@ -224,6 +227,41 @@ describe('fromJSON()', () => {
     fromJSON(fresh, wireFormat)
     expect(fresh.freq.attached!.params.freq.dial.value).toBe(6.33)
     expect(fresh.freq.modDepth).toBe(0.6)
+  })
+
+  it('round-trips glide — slot state like depth/mode', () => {
+    const d = { freq: dial(600) }
+    setGlide(d.freq, 2.5)
+    const fresh = { freq: dial(0) }
+    fromJSON(fresh, JSON.parse(JSON.stringify(toJSON(d))))
+    expect(fresh.freq.glide).toBe(2.5)
+  })
+
+  it("leaves the slot's glide when the snapshot has none", () => {
+    const d = { freq: dial(600) }
+    setGlide(d.freq, 1)
+    fromJSON(d, { freq: { value: 5 } })
+    expect(d.freq.glide).toBe(1)
+  })
+
+  it('drops a snapshot attachment onto a non-modulatable slot', () => {
+    // The code owns the meta: if it says the slot doesn't modulate, a
+    // snapshot written under an older meta can't re-arm it. Value and
+    // slot-level state still hydrate.
+    const snap = {
+      freq: {
+        value: 42,
+        depth: 0.5,
+        glide: 1.5,
+        attached: { name: 'sine', params: {} },
+      },
+    } as unknown as DialsSnap
+    const d = { freq: dial(600, { modulatable: false }) }
+    fromJSON(d, snap)
+    expect(d.freq.attached).toBeNull()
+    expect(d.freq.dial.value).toBe(42)
+    expect(d.freq.modDepth).toBe(0.5)
+    expect(d.freq.glide).toBe(1.5)
   })
 })
 

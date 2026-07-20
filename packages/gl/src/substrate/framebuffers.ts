@@ -154,6 +154,29 @@ export function toTargetNoClear(
 }
 
 /**
+ * Shared-FBO variant of `toTarget`: attach an arbitrary texture to a
+ * caller-owned framebuffer, set viewport, draw, restore. This is the
+ * idiom for renderers with many rotating targets (texture rings) —
+ * one FBO total, re-attached per draw, instead of one FBO per
+ * texture. No clear: these passes overwrite every texel.
+ */
+export function toTexture(
+  gl: WebGL2RenderingContext,
+  fbo: WebGLFramebuffer,
+  tex: WebGLTexture,
+  w: number,
+  h: number,
+  draw: () => void,
+): WebGLTexture {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+  gl.viewport(0, 0, w, h)
+  draw()
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  return tex
+}
+
+/**
  * Bind the screen (default framebuffer), set viewport, run draw
  * callback. No clear by default — terminal pass usually composites
  * over whatever's already there.

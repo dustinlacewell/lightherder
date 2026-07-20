@@ -174,6 +174,13 @@ export function instantiate<P extends Record<string, unknown>, Out>(
 }
 
 // ─── Registry ─────────────────────────────────────────────────────────
+//
+// A single module-level registry: one source palette per process.
+// Known limitation, accepted for now — two surfaces in one app cannot
+// offer different palettes, and per-slot filtering is only the binary
+// `meta.modulatable`. If a host ever needs scoped palettes, the shape
+// is an injectable registry on the Panel (defaulting to this one), not
+// more flags here.
 
 const REGISTRY = new Map<string, SourceDef<Record<string, unknown>, unknown>>()
 

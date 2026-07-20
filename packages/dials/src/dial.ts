@@ -46,6 +46,7 @@ export function slotFromDial<T>(type: string, dial: Dial<T>): Slot<T> {
     attached: null,
     modDepth: 0,
     modMode: 'center',
+    glide: 0,
   }
 }
 
@@ -66,4 +67,29 @@ export function setDial<T>(slot: Slot<T>, value: T): void {
     return
   }
   slot.dial.value = value
+}
+
+/**
+ * Re-home a slot: its CURRENT value becomes the reset target
+ * (`dial.initial` — what editors return to on double-click / Home).
+ * Recurses through an attached source's sub-slots. This is the one
+ * sanctioned writer of `initial`, for hosts whose slot trees are
+ * cloned projections of a live prototype — an instance's knobs
+ * inherit the prototype's current state as their defaults.
+ */
+export function rebaseSlot(slot: Slot<unknown>): void {
+  ;(slot.dial as { initial: unknown }).initial = slot.dial.value
+  if (slot.attached)
+    for (const k in slot.attached.params)
+      rebaseSlot(slot.attached.params[k] as Slot<unknown>)
+}
+
+/**
+ * Set the slot's glide time constant, clamped to `>= 0` seconds.
+ * Slot-level state like `modDepth`/`modMode` — works whether or not a
+ * source is attached, and survives detach/reattach. The sampler slews
+ * the slot's combined output through it (see `Slot.glide`).
+ */
+export function setGlide(slot: Slot<unknown>, seconds: number): void {
+  slot.glide = Math.max(0, seconds)
 }

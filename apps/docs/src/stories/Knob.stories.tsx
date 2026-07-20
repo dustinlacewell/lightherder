@@ -84,6 +84,38 @@ export const Stepped: StoryObj<typeof Knob> = {
 }
 
 /**
+ * `glide` (0…1) draws a thin glide bar in the arc's bottom gap — a
+ * readout of how much smoothing the slot's value carries, filling
+ * left→right with the amount. Set it in place with SHIFT + right-drag on
+ * the knob (a shift+right *click* that doesn't move is left alone, so a
+ * host chord like a port toggle still works). The host maps its own
+ * glide seconds to this 0…1.
+ */
+export const Glide: StoryObj<typeof Knob> = {
+  render: () => {
+    const [v, setV] = useState(0.5)
+    const [glide, setGlide] = useState(0.6)
+    return (
+      <Panel style={{ padding: 20 }}>
+        <Knob
+          value={v}
+          baseline={v}
+          range={[0, 1]}
+          glide={glide}
+          onChangeGlide={setGlide}
+          defaultValue={0.5}
+          label="glide"
+          onChangeBaseline={setV}
+        />
+        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
+          shift + right-drag · glide {glide.toFixed(2)}
+        </div>
+      </Panel>
+    )
+  },
+}
+
+/**
  * The full modulated look: an rAF-driven sine LFO wanders the live
  * value around the baseline — the fill arc and pointer ride it in the
  * modulation accent, sweeping over a white inlay band that marks the

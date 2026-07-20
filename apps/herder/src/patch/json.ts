@@ -8,8 +8,9 @@ import { makeEdge, makeNode, SWITCH_INS, validConnection, type NodeKind, type Pa
 import type { InstVals } from './library';
 import { GLOBAL_PARAMS, PARAMS, globalSlots } from './params';
 import { applySnapOverlay, treeToSnap } from './slots';
+import { FX } from '../fx';
 
-const KINDS: NodeKind[] = ['media', 'draw', 'camera', 'monitor', 'mixer', 'switch', 'dial', 'xypad', 'in', 'out', 'module'];
+const KINDS: NodeKind[] = ['media', 'webcam', 'draw', 'camera', 'monitor', 'mixer', 'delay', 'switch', 'dial', 'xypad', 'in', 'out', 'module', ...(Object.keys(FX) as NodeKind[])];
 const MAX_DEPTH = 16;
 
 /** one level of graph as a plain JSON-able object — module patches

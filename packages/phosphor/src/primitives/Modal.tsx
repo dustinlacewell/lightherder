@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ModalProps {
   /** When false, renders nothing. */
@@ -42,6 +43,14 @@ interface ModalProps {
  * Mounts/unmounts on toggle so the fade-in plays on every open;
  * closes are instantaneous (no exit animation) which matches the
  * rest of the chrome family.
+ *
+ * Portaled to `document.body` — inline rendering left the backdrop's
+ * stacking (and therefore backdrop-click dismissal) at the mercy of
+ * whatever ancestor happened to host the trigger (a stray `transform`
+ * or `isolation` upstream can trap a fixed-position child in a local
+ * stacking context, no matter its z-index). Mounting at the document
+ * root makes "click off to close" structurally guaranteed for every
+ * consumer, not just the ones whose call site happens to be clean.
  */
 export function Modal({
   open,
@@ -63,7 +72,7 @@ export function Modal({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -77,6 +86,7 @@ export function Modal({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

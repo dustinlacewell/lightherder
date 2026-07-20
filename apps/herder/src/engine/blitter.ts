@@ -10,9 +10,9 @@
    The blitter owns the screen-space pass and the popped-out preview
    sink; the engine hands it a texture lookup and the clock. */
 
-import type { GLC } from '../gl/context';
-import { makeProgram, type Prog } from '../gl/program';
-import { QUAD_VERT, SCREEN_FRAG } from '../gl/shaders';
+import { applyUniforms, createProgram, reflectUniforms, type ReflectedUniform } from '@ldlework/gl';
+import type { GLC } from './context';
+import { QUAD_VERT, SCREEN_FRAG } from './shaders';
 import type { PatchNode } from '../patch';
 import { mirror, stage, type PopoutSink } from '../runtime';
 
@@ -22,12 +22,14 @@ import { mirror, stage, type PopoutSink } from '../runtime';
 export type TexOf = (n: PatchNode, tap: number) => WebGLTexture | null;
 
 export class Blitter {
-  private scrP: Prog;
+  private prog: WebGLProgram;
+  private u: Record<string, ReflectedUniform>;
   private vao: WebGLVertexArrayObject;
   private popoutStamp = '';
 
   constructor(private g: GLC) {
-    this.scrP = makeProgram(g, QUAD_VERT, SCREEN_FRAG);
+    this.prog = createProgram(g.gl, QUAD_VERT, SCREEN_FRAG);
+    this.u = reflectUniforms(g.gl, this.prog);
     this.vao = g.gl.createVertexArray()!;
   }
 
@@ -50,11 +52,8 @@ export class Blitter {
     gl.viewport(0, 0, viewW, viewH);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    gl.useProgram(this.scrP.p);
-    const U = this.scrP.u;
-    gl.uniform2f(U.uView, viewW, viewH);
-    gl.uniform1f(U.uTime, now * 0.001);
-    gl.uniform1i(U.uTex, 0);
+    gl.useProgram(this.prog);
+    applyUniforms(gl, this.u, { uView: [viewW, viewH], uTime: now * 0.001 });
     gl.bindVertexArray(this.vao);
 
     const dpr = viewW / Math.max(1, window.innerWidth);
@@ -69,7 +68,7 @@ export class Blitter {
        its panel and the other shields go opaque to everything below */
     if (pv.el?.isConnected && pv.nodeId) {
       const n = byId.get(pv.nodeId);
-      if (n) this.blitRect(U, pv.el, n, dpr, texOf, pv.tap);
+      if (n) this.blitRect(pv.el, n, dpr, texOf, pv.tap);
     }
     for (const el of stage.shields) {
       if (!el.isConnected) { stage.shields.delete(el); continue; }
@@ -77,7 +76,7 @@ export class Blitter {
     }
 
     for (const f of this.facesTopDown(byId)) {
-      this.blitRect(U, f.el, f.n, dpr, texOf);
+      this.blitRect(f.el, f.n, dpr, texOf);
       this.stencilRect(f.wrap.getBoundingClientRect(), dpr, viewH);
     }
     gl.disable(gl.STENCIL_TEST);
@@ -111,16 +110,11 @@ export class Blitter {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, glass.width, glass.height);
-    gl.useProgram(this.scrP.p);
-    const U = this.scrP.u;
-    gl.uniform2f(U.uView, glass.width, glass.height);
-    gl.uniform1f(U.uTime, simTime);
-    gl.uniform1i(U.uTex, 0);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.uniform2f(U.uCenter, pw / 2, ph / 2);
-    gl.uniform2f(U.uHalf, pw / 2, ph / 2);
-    gl.uniform2f(U.uPx, pw, ph);
+    gl.useProgram(this.prog);
+    applyUniforms(gl, this.u, {
+      uView: [glass.width, glass.height], uTime: simTime, uTex: tex,
+      uCenter: [pw / 2, ph / 2], uHalf: [pw / 2, ph / 2], uPx: [pw, ph],
+    });
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -156,17 +150,18 @@ export class Blitter {
     gl.disable(gl.SCISSOR_TEST);
   }
 
-  private blitRect(U: Record<string, WebGLUniformLocation>, el: HTMLElement, n: PatchNode, dpr: number, texOf: TexOf, tap = 0): void {
+  private blitRect(el: HTMLElement, n: PatchNode, dpr: number, texOf: TexOf, tap = 0): void {
     const gl = this.g.gl;
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.right < 0 || r.bottom < 0 || r.left > window.innerWidth || r.top > window.innerHeight) return;
     const tex = texOf(n, tap);
     if (!tex) return;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.uniform2f(U.uCenter, (r.left + r.width / 2) * dpr, (r.top + r.height / 2) * dpr);
-    gl.uniform2f(U.uHalf, r.width / 2 * dpr, r.height / 2 * dpr);
-    gl.uniform2f(U.uPx, r.width * dpr, r.height * dpr);
+    applyUniforms(gl, this.u, {
+      uTex: tex,
+      uCenter: [(r.left + r.width / 2) * dpr, (r.top + r.height / 2) * dpr],
+      uHalf: [r.width / 2 * dpr, r.height / 2 * dpr],
+      uPx: [r.width * dpr, r.height * dpr],
+    });
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 }

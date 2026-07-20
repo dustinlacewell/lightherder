@@ -6,10 +6,14 @@
  *   - `sampleSlot(slot, ctx)`   — pull one slot
  *   - `sampleSource(source, ctx)` — pull one source
  *
- * A slot's output is its dial's *base* value (with `meta.lerp`
- * smoothing applied — under modulation too), plus, while a source is
+ * A slot's output is its dial's *base* value, plus, while a source is
  * attached, the source's normalized signal scaled by the slot's
- * `modDepth` — combined in knob-travel space via `toPos`/`fromPos`. The
+ * `modDepth` — combined in knob-travel space via `toPos`/`fromPos` —
+ * with `slot.glide` smoothing applied LAST, to the combined result.
+ * Glide is a slew limiter on the whole signal: a fast source through a
+ * heavy glide arrives as a gentle sweep, not a jitter (baseline +
+ * modulation form the instantaneous target; the one-pole eases toward
+ * it). With no source attached this is just the baseline eased. The
  * raw signal is first remapped through the slot's `modMode`: it is
  * normalized to a canonical shape (bipolar `b ∈ [-1,1]`, unipolar
  * `u ∈ [0,1]`) from the source's `polarity`, then `'center'` swings
@@ -42,8 +46,11 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function sampleSlot<T>(slot: Slot<T>, ctx: Ctx): T {
   const att = slot.attached
-  const base = sampleDial(slot, ctx)
-  let out = base
+  // The raw target — the knob value combined with any attached
+  // modulation, BEFORE smoothing. Glide runs last, on this combined
+  // value, so it slews the whole signal (see `glideTowards`).
+  const base = slot.dial.value
+  let out: T = base
   if (att) {
     const signal = sampleSource(att, ctx)
     if (typeof base === 'number' && typeof signal === 'number') {
@@ -103,40 +110,37 @@ export function sampleSlot<T>(slot: Slot<T>, ctx: Ctx): T {
       out = signal
     }
   }
+  out = glideTowards(slot, out, ctx)
   slot.lastSample = out
   return out
 }
 
 /**
- * Emit the dial's literal value, applying `meta.lerp` one-pole
- * smoothing when configured. Without `lerp` this is just the raw
- * target — zero cost, zero state. With it, the output eases toward the
- * target over ~`tau` seconds so drags and preset loads glide in.
+ * Ease the slot's combined output toward `target` with `slot.glide`
+ * one-pole smoothing when set. `target` is the fully combined signal
+ * (baseline + any modulation), so glide slews the whole thing — a fast
+ * source through a heavy glide arrives as a gentle sweep. With glide
+ * `0` (or on a non-numeric target) this is a pass-through — zero cost,
+ * zero state.
  *
- * The filter memory lives on the slot (`_lerpY`); first sample seeds it
- * to the current target so smoothing starts from where the dial is, not
- * from zero.
+ * The filter memory lives on the slot (`_glideY`); first sample seeds
+ * it to the current target so smoothing starts from where the signal
+ * is, not from zero.
  */
-function sampleDial<T>(slot: Slot<T>, ctx: Ctx): T {
-  const target = slot.dial.value
-  const meta = slot.dial.meta as { lerp?: number }
-  const tau = meta.lerp
-  if (
-    typeof target !== 'number' ||
-    typeof tau !== 'number' ||
-    !(tau > 0)
-  ) {
+function glideTowards<T>(slot: Slot<T>, target: T, ctx: Ctx): T {
+  const tau = slot.glide
+  if (typeof target !== 'number' || !(tau > 0)) {
     return target
   }
-  const prev = slot._lerpY
+  const prev = slot._glideY
   if (typeof prev !== 'number' || !Number.isFinite(prev)) {
-    slot._lerpY = target
+    slot._glideY = target
     return target
   }
   const dt = typeof ctx['dt'] === 'number' ? (ctx['dt'] as number) : 1 / 60
   const alpha = 1 - Math.exp(-dt / tau)
   const y = prev + (target - prev) * alpha
-  slot._lerpY = y
+  slot._glideY = y
   return y as T
 }
 

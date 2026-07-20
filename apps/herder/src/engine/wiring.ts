@@ -73,6 +73,12 @@ export class Wiring {
         if (!src) continue;
         if (src.type === 'in' || src.type === 'out') {
           stack.push({ key: `${src.id}|c:in`, depth: depth + 1 });
+        } else if (src.type === 'switch') {
+          /* a control switch is pure routing, like its video twin: ride
+             through the selected input (held overrides the latched sel),
+             so only that dial's wire reaches this port */
+          const sel = heldInput(src.id) ?? src.data.sel;
+          stack.push({ key: `${src.id}|c:in${sel + 1}`, depth: depth + 1 });
         } else if (src.type === 'dial' || src.type === 'xypad') {
           const axis = src.type === 'dial' ? 'val' : (e.sourceHandle?.slice(2) || 'x');
           const stamp = dials.stampOf(src.id, axis);

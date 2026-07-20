@@ -39,6 +39,12 @@ export interface SlotSnap {
    * the slot's current mode.
    */
   mode?: ModMode
+  /**
+   * Glide time constant in seconds — slot-level user state like
+   * `depth`/`mode`, so a dialed-in glide round-trips. Absent snapshots
+   * leave the slot's current glide.
+   */
+  glide?: number
   attached?: SourceSnap
 }
 
@@ -64,6 +70,7 @@ function slotToSnap(slot: Slot<unknown>): SlotSnap {
     value: slot.dial.value,
     depth: slot.modDepth,
     mode: slot.modMode,
+    glide: slot.glide,
   }
   if (slot.attached) {
     const params: Record<string, SlotSnap> = {}
@@ -123,6 +130,14 @@ function applySlotSnap(
   onMissing: 'throw' | 'drop',
 ): void {
   setDial(slot, snap.value)
+  if (snap.attached && slot.dial.meta.modulatable === false) {
+    // The code says this slot doesn't modulate — a snapshot (stale, or
+    // written under an older meta) can't override that. Keep the value
+    // and slot-level state, drop the attachment.
+    detach(slot)
+    applySlotLevel(slot, snap)
+    return
+  }
   if (snap.attached) {
     const def = getSource(snap.attached.name)
     if (!def) {
@@ -151,13 +166,14 @@ function applySlotSnap(
 }
 
 /**
- * Apply the slot-level modulation state (mode, then depth) from a
- * snapshot. Depth is applied AFTER any attach so the attach-time
- * seeding (which fires while modDepth is still 0) can't clobber an
- * explicit snapshot value — including an explicit 0. Absent fields
- * leave the slot's current value (its 'center' / seeded default).
+ * Apply the slot-level state (mode, depth, glide) from a snapshot.
+ * Depth is applied AFTER any attach so the attach-time seeding (which
+ * fires while modDepth is still 0) can't clobber an explicit snapshot
+ * value — including an explicit 0. Absent fields leave the slot's
+ * current value (its 'center' / seeded default).
  */
 function applySlotLevel(slot: Slot<unknown>, snap: SlotSnap): void {
   if (snap.mode) slot.modMode = snap.mode
   if (typeof snap.depth === 'number') slot.modDepth = snap.depth
+  if (typeof snap.glide === 'number') slot.glide = snap.glide
 }

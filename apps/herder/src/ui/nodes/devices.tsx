@@ -3,16 +3,18 @@
    faces are placeholder wells the engine blits the live textures
    over. */
 
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
 import { SlotRow, PanelComponentsProvider } from '@ldlework/dials/react';
 import { useStore } from '@xyflow/react';
-import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI } from '../../patch';
-import { dispatch, holdSwitch, mirror, releaseSwitch } from '../../runtime';
+import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI, type NodeKind } from '../../patch';
+import { dispatch, holdSwitch, mirror, releaseSwitch, watchTick } from '../../runtime';
+import { FX } from '../../fx';
 import { ArcGauge, XYPad } from '../controls/Knob';
 import { SlotNodeProvider, dialFaceComponents, liveOverrideFor } from '../controls/dialsBundle';
 import type { DeviceProps } from '../bench/types';
 import { CPort, Face, ResetBtn, Shell, useSetParam, VPort, type FixedPort } from './Shell';
+import { FlavorBtn, useFlavorHandles } from './modules';
 
 /* what a reset leaves alone — routing and geometry are yours; only
    the electronics get wiped clean */
@@ -54,7 +56,7 @@ export function MonitorNode({ id, data }: DeviceProps) {
       headBtns={
         <ResetBtn
           id={id} kind="monitor"
-          title="Reset to a transparent pass — bright, contrast, sat, hue, delay and persistence all back to identity."
+          title="Reset to a transparent pass — bright, contrast, sat, hue and persistence all back to identity."
         />
       }
       face={<Face id={id} sparkable />}
@@ -63,6 +65,29 @@ export function MonitorNode({ id, data }: DeviceProps) {
     </Shell>
   );
 }
+
+/* the simple 1-in effects share one shell shape: an input, a face
+   well, a knob drawer, an output. The words come off the FX def. */
+function makeEffectNode(kind: NodeKind) {
+  const m = FX[kind as keyof typeof FX];
+  const fixed: FixedPort[] = [{ kind: 'v', id: 'v:in', label: 'In', desc: m.face.inp }];
+  return function EffectNode({ id, data }: DeviceProps) {
+    return (
+      <Shell
+        id={id} data={data} kind={kind} fixed={fixed}
+        headBtns={<ResetBtn id={id} kind={kind} title={m.face.reset} />}
+        face={<Face id={id} sparkable={false} />}
+      >
+        <VPort dir="out" id="v:out" top={95} desc={m.face.out} />
+      </Shell>
+    );
+  };
+}
+
+/* the registry entries React Flow gets — one stable component per kind */
+export const effectNodes = Object.fromEntries(
+  Object.keys(FX).map(k => [k, makeEffectNode(k as NodeKind)]),
+);
 
 export function MixerNode({ id, data }: DeviceProps) {
   const setParam = useSetParam(id);
@@ -101,8 +126,16 @@ export function SwitchNode({ id, data }: DeviceProps) {
   const active = held ?? data.sel;
   const release = (): void => { releaseSwitch(id); setHeld(null); };
   const tops = Array.from({ length: SWITCH_INS }, (_, i) => 59 + i * 32);
+  /* one selector, two flavors (the header VID/CTL button, like an IN/OUT):
+     a video switch cuts between four pictures (amber ports), a control
+     switch selects among four dial signals (teal). The `flavor` is the
+     only difference — the routing UI is identical. */
+  const flavor = data.flavor ?? 'v';
+  const ctl = flavor === 'c';
+  const Port = ctl ? CPort : VPort;
+  useFlavorHandles(id, flavor);
   return (
-    <Shell id={id} data={data} kind="switch">
+    <Shell id={id} data={data} kind="switch" headBtns={<FlavorBtn id={id} flavor={flavor} />}>
       <div className="swcol nodrag">
         {tops.map((_, i) => (
           <button
@@ -120,9 +153,11 @@ export function SwitchNode({ id, data }: DeviceProps) {
         ))}
       </div>
       {tops.map((top, i) => (
-        <VPort key={i} dir="in" id={`v:in${i + 1}`} top={top} desc={`input ${i + 1}`} />
+        <Port key={i} dir="in" id={`${flavor}:in${i + 1}`} top={top} desc={`input ${i + 1}`} />
       ))}
-      <VPort dir="out" id="v:out" top={107} desc="whichever input is routed — a cut is instant" />
+      <Port dir="out" id={`${flavor}:out`} top={107} desc={ctl
+        ? 'whichever dial signal is routed — a cut is instant'
+        : 'whichever input is routed — a cut is instant'} />
     </Shell>
   );
 }
@@ -160,6 +195,28 @@ function dialPolarity(id: string, sourceHandle: string): 'uni' | 'bi' {
   return uni ? 'uni' : 'bi';
 }
 
+/* how deep the val's VISIBLE modulation nests: 0 = bare knob (or the
+   sub-panel folded away — slot.folded is the SlotRow's fold state,
+   carried on the slot precisely so this walk can see it), +1 per
+   expanded level. Each level renders as an indented sub-panel
+   (phosphor's .pd-row-nested), so the node widens by one indent per
+   visible level and shrinks back when a fold hides the rest. */
+function visibleModDepth(slot: Slot<unknown>): number {
+  const src = slot.attached;
+  if (!src || slot.folded) return 0;
+  let deepest = 0;
+  for (const k in src.params) {
+    deepest = Math.max(deepest, visibleModDepth(src.params[k] as Slot<unknown>));
+  }
+  return 1 + deepest;
+}
+
+const DIAL_BASE_W = 110; // .dev-dial base, matches style.css
+/* each nesting level is just an indent: .pd-row-nested adds margin-left
+   10 + padding-left 10 + 2px border ≈ 22px; the knobs stay the same
+   size, only pushed right. So a level costs one indent, not a panel. */
+const DIAL_PER_LEVEL = 22;
+
 /* The dial's val is a full dials SlotRow — the same knob, attach picker,
    modulation tree and MIDI chrome as any drawer param — so a dial is a
    general modulation source: attach an LFO to its val, wire c:out to any
@@ -169,7 +226,6 @@ function dialPolarity(id: string, sourceHandle: string): 'uni' | 'bi' {
 export function DialNode({ id, data }: DeviceProps) {
   const [, repaint] = useReducer((x: number) => x + 1, 0);
   const setParam = useSetParam(id);
-  const setLerp = (v: number) => setParam('lerp', v);
   const live = useMemo(() => liveOverrideFor(id), [id]);
   const node = useMemo(() => ({ id }), [id]);
   const val = data.slots.val as Slot<number>;
@@ -178,8 +234,7 @@ export function DialNode({ id, data }: DeviceProps) {
   const uni = useMemo(() => dialPolarity(id, 'c:out') === 'uni', [id, edges]);
   /* polarity re-range lives on the slot's META — the knob face, the MIDI
      CC mapping and the modulation depth scaling all read min/max there,
-     so one write retunes all three (the same in-place meta channel
-     StampBank uses for lerp). Display-plus-travel only: the engine's
+     so one write retunes all three. Display-plus-travel only: the engine's
      wire combine keys off the TARGET port's polarity, not this. NB: a
      module-inner dial's meta is shared with its sibling clones
      (cloneSlot shares meta by reference) — the re-range follows whichever
@@ -194,15 +249,22 @@ export function DialNode({ id, data }: DeviceProps) {
     }
     if (uni && val.dial.value < 0) setParam('val', 0);
   }, [uni, val, val.dial.value]);
+  /* widen the node by the val's VISIBLE modulation depth so the expanded
+     tree fits and a fold shrinks the node back; the knob keeps its
+     left/right position (the body is left-anchored, growth goes right).
+     Recomputed each render — attach/detach AND fold toggles repaint via
+     the SlotRow's onChange. */
+  const width = DIAL_BASE_W + visibleModDepth(val) * DIAL_PER_LEVEL;
   return (
-    <Shell id={id} data={data} kind="dial">
+    <Shell id={id} data={data} kind="dial" style={{ width }}>
       <div className="dialbody dials-strip nodrag">
         <SlotNodeProvider node={node}>
           <PanelComponentsProvider value={dialFaceComponents}>
+            {/* the val knob shows glide as its own bar and takes the
+                glide gesture (shift+right-drag → the dial's lerp param) */}
             <SlotRow label="val" path={['val']} slot={val} liveOverride={live} onChange={repaint} />
           </PanelComponentsProvider>
         </SlotNodeProvider>
-        <ArcGauge def={PARAMS.dial.lerp} value={(data.slots.lerp as Slot<number>).dial.value} onChange={setLerp} />
       </div>
       <CPort dir="out" id="c:out" top={80} desc="the control signal — wire it to a camera's rot or zoom port" />
     </Shell>
@@ -210,8 +272,9 @@ export function DialNode({ id, data }: DeviceProps) {
 }
 
 export function XyPadNode({ id, data }: DeviceProps) {
+  const [, repaint] = useReducer((x: number) => x + 1, 0);
   const setParam = useSetParam(id);
-  const setLerp = (v: number) => setParam('lerp', v);
+  const live = useMemo(() => liveOverrideFor(id), [id]);
   const edges = useStore(s => s.edges);
   const uniX = useMemo(() => dialPolarity(id, 'c:x') === 'uni', [id, edges]);
   const uniY = useMemo(() => dialPolarity(id, 'c:y') === 'uni', [id, edges]);
@@ -221,14 +284,42 @@ export function XyPadNode({ id, data }: DeviceProps) {
   useEffect(() => {
     if (uniY && (data.slots.y as Slot<number>).dial.value < 0) setParam('y', 0);
   }, [uniY, (data.slots.y as Slot<number>).dial.value]);
+  /* the glided OUTPUT each axis puts on its wire — the engine's resolved
+     truth (liveOverrideFor rides the mirror clone for a module-inner pad;
+     at root it declines and we read the view slot's own lastSample). Poll
+     it each frame so the lag puck eases smoothly toward the selection. */
+  const slotX = data.slots.x as Slot<number>, slotY = data.slots.y as Slot<number>;
+  const outX = live(['x'], slotX)?.() ?? slotX.lastSample ?? slotX.dial.value;
+  const outY = live(['y'], slotY)?.() ?? slotY.lastSample ?? slotY.dial.value;
+  /* follow the glided output on the engine's tick pulse (the only
+     moment it can move), repainting only when it actually does — the
+     lag puck eases while a slew is set and goes quiet once the output
+     has caught the selection */
+  const lastOut = useRef({ x: outX, y: outY });
+  useEffect(() => watchTick(() => {
+    const nx = live(['x'], slotX)?.() ?? slotX.lastSample ?? slotX.dial.value;
+    const ny = live(['y'], slotY)?.() ?? slotY.lastSample ?? slotY.dial.value;
+    if (nx !== lastOut.current.x || ny !== lastOut.current.y) {
+      lastOut.current = { x: nx, y: ny };
+      repaint();
+    }
+  }), [id, slotX, slotY, live]);
   return (
     <Shell id={id} data={data} kind="xypad">
       <div className="xypadbody">
         <XYPad
-          defX={uniX ? XYPAD_X_UNI : PARAMS.xypad.x} x={(data.slots.x as Slot<number>).dial.value} onX={v => setParam('x', v)} midiX={`${id}:x`}
-          defY={uniY ? XYPAD_Y_UNI : PARAMS.xypad.y} y={(data.slots.y as Slot<number>).dial.value} onY={v => setParam('y', v)} midiY={`${id}:y`}
+          defX={uniX ? XYPAD_X_UNI : PARAMS.xypad.x} x={slotX.dial.value} onX={v => setParam('x', v)} midiX={`${id}:x`}
+          defY={uniY ? XYPAD_Y_UNI : PARAMS.xypad.y} y={slotY.dial.value} onY={v => setParam('y', v)} midiY={`${id}:y`}
+          outX={outX} outY={outY}
         />
-        <ArcGauge def={PARAMS.xypad.lerp} value={(data.slots.lerp as Slot<number>).dial.value} onChange={setLerp} />
+        <div className="xypad-lerps">
+          <span className="xypad-lerp"><span className="xypad-lerp-tag">X</span>
+            <ArcGauge def={PARAMS.xypad.lerpx} value={(data.slots.lerpx as Slot<number>).dial.value} onChange={v => setParam('lerpx', v)} />
+          </span>
+          <span className="xypad-lerp"><span className="xypad-lerp-tag">Y</span>
+            <ArcGauge def={PARAMS.xypad.lerpy} value={(data.slots.lerpy as Slot<number>).dial.value} onChange={v => setParam('lerpy', v)} />
+          </span>
+        </div>
       </div>
       <CPort dir="out" id="c:x" top={80} desc="the X control signal — wire it to a camera's port" />
       <CPort dir="out" id="c:y" top={100} desc="the Y control signal — wire it to a camera's port" />

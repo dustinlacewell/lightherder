@@ -25,8 +25,20 @@ export interface EngineApi {
   setResolution(step: number): void;
   /** load dropped media into a media node */
   loadMedia(id: string, file: Blob): Promise<void>;
+  /** point a media node at a remote video URL instead of a dropped file */
+  loadMediaUrl(id: string, url: string): Promise<void>;
+  /** ask for the camera and start a webcam node's stream — must run from
+      a user gesture */
+  startWebcam(id: string): Promise<void>;
+  /** release a webcam node's stream without dropping the node */
+  stopWebcam(id: string): void;
+  /** whether a webcam node currently has a live stream */
+  webcamLive(id: string): boolean;
   /** the draw node's paint surface */
   drawFor(id: string): DrawSurface;
+  /** release a PARKED node's live state (rings, textures, stamps) —
+      its stored media stays put for when the view swings back */
+  parkNode(id: string): void;
   /** release a departed node's GPU state and stored media */
   dropNode(id: string): void;
 }

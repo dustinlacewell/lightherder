@@ -5,7 +5,7 @@
    monitor. All the graph logic lives in the hooks; this component
    only composes. */
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { PanelComponentsProvider } from '@ldlework/dials/react';
 import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useStoreApi } from '@xyflow/react';
 import { herderPanelComponents } from '../controls/dialsBundle';
@@ -29,13 +29,17 @@ import { PresenceLayer } from './PresenceLayer';
 import { useBench } from './useBench';
 import { isSteering, useFollow } from './useFollow';
 import { useClipboard } from './useClipboard';
+import { useSelectionClipboard } from './useSelectionClipboard';
 import { usePersistence } from './usePersistence';
 import { useSpawn } from './useSpawn';
 
 export function Bench() {
+  /* the flavor of the cable mid-drag — styles the connection line */
+  const [wiring, setWiring] = useState<'v' | 'c' | null>(null);
   const bench = useBench();
   const persist = usePersistence(bench);
   const { copyPatch, pastePatch } = useClipboard(bench);
+  const { copySelection, pasteSelection } = useSelectionClipboard(bench);
   const { spawn, dropLib } = useSpawn(bench);
   const pin = usePreviewPin(bench.nodes, bench.flat);
   const { frozen, setFrozen, stepTick } = useFreeze();
@@ -44,6 +48,9 @@ export function Bench() {
   const rf = useReactFlow();
   const rfStore = useStoreApi();
   useFollow(bench.goTo);
+  /* the middle-mousedown point, held until mouseUp decides whether this
+     was a ping (no travel) or the tail of a middle-drag pan (see below) */
+  const pingOrigin = useRef<{ x: number; y: number } | null>(null);
 
   /* a live read-only peer is a viewer: React Flow stops originating
      document edits (drags, new wires, Delete-key removals) so no op is
@@ -56,6 +63,30 @@ export function Bench() {
      transport; a blocked edit bumps deniedAt and the pill flashes. Keying
      the node on deniedAt restarts the CSS flash animation on each bump. */
   const readOnly = session.phase === 'live' && session.role === 'peer' && !session.write;
+
+  /* Ctrl+C / Ctrl+V on the selection — mirrors Transport's own listener
+     (guard text inputs/knobs, ignore while typing). Select-all rubber-
+     stamps every node on the viewed level, the same result a full drag
+     across the whole bench would give. Paste is a no-op for a read-only
+     peer: useSelectionClipboard's own gate check would block it anyway,
+     but skipping here avoids a doomed clipboard read. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const el = e.target as HTMLElement;
+      if (el.closest('input, textarea, .knob')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'c') { copySelection(); e.preventDefault(); }
+      else if (k === 'v') { if (canWrite) pasteSelection(); e.preventDefault(); }
+      else if (k === 'a') {
+        if (!canWrite) return;
+        rf.setNodes(ns => ns.map(n => ({ ...n, selected: true })));
+        e.preventDefault();
+      }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [copySelection, pasteSelection, canWrite, rf]);
 
   /* the session reaches the document and the live-swap rebuild through
      this seam alone — never into React. `rebuild` is unused until the
@@ -122,7 +153,7 @@ export function Bench() {
   return (
     <PanelComponentsProvider value={herderPanelComponents}>
     <div
-      className="bench"
+      className={"bench" + (wiring ? ` wiring-${wiring}` : "")}
       /* presence: the pointer in flow space, streamed to the room. The
          wrapper sees every move — pane, nodes, mid-drag (RF's pointer
          capture still bubbles through it) — and the rAF coalescer in
@@ -131,10 +162,22 @@ export function Bench() {
       onPointerMove={e => announcePresence({ cur: flowAt(e.clientX, e.clientY) })}
       onPointerLeave={() => announcePresence({ cur: null })}
       /* middle click pings the bench — a "look here" any role may make.
+         The middle button also now pans (panOnDrag=[1]), so a ping only
+         fires on mouseUP with no meaningful travel since mouseDOWN — a
+         middle-drag-to-pan never leaves a stray ping at the drag's end.
          preventDefault keeps the browser's autoscroll cursor out of it. */
       onMouseDown={e => {
         if (e.button !== 1) return;
         e.preventDefault();
+        pingOrigin.current = { x: e.clientX, y: e.clientY };
+      }}
+      onMouseUp={e => {
+        if (e.button !== 1) return;
+        const origin = pingOrigin.current;
+        pingOrigin.current = null;
+        if (!origin) return;
+        const moved = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
+        if (moved > 4) return;   // a middle-drag panned; not a ping
         const p = flowAt(e.clientX, e.clientY);
         pingBench(p.x, p.y);
       }}
@@ -171,10 +214,11 @@ export function Bench() {
         /* presence: a cable drag ghosts on every peer's bench — anchored
            at this handle, loose end following our cursor */
         onConnectStart={(_, h) => {
+          setWiring(h.handleId?.startsWith('c:') ? 'c' : 'v');
           if (h.nodeId && h.handleId)
             announcePresence({ wire: { node: h.nodeId, handle: h.handleId, from: h.handleType ?? 'source' } });
         }}
-        onConnectEnd={() => announcePresence({ wire: undefined })}
+        onConnectEnd={() => { setWiring(null); announcePresence({ wire: undefined }); }}
         /* presence: the camera rides the stream as a flow-space CENTER
            plus zoom — a center, not the raw offset, so peers with
            different window sizes agree on the point being looked at.
@@ -203,8 +247,19 @@ export function Bench() {
         edgesFocusable={canWrite}
         deleteKeyCode={canWrite ? ['Delete', 'Backspace'] : null}
         /* Shift belongs to the TAP gesture (and fine knob drags) — box
-           selection would overlay the faces and eat shift-clicks */
+           selection would overlay the faces and eat shift-clicks. A
+           plain left-drag on empty bench now rubber-bands a selection
+           (selectionOnDrag); panning moves to the middle button
+           (panOnDrag=[1]) and Ctrl+drag stays a selection alias so
+           either habit works. */
+        /* off-screen devices don't render DOM at all — their document
+           state is untouched (drawer open/close lives in node data) and
+           the blitter already skips unmounted faces, so a big bench
+           only pays for the corner of it on screen */
+        onlyRenderVisibleElements
+        selectionOnDrag
         selectionKeyCode="Control"
+        panOnDrag={[1]}
         zoomOnDoubleClick={false}
         minZoom={0.15}
         maxZoom={2.5}

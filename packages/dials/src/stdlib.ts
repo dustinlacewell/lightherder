@@ -40,8 +40,9 @@ import {
 
 /**
  * Convenience for stdlib param defs — every param is a number dial.
- * `description` (last arg) is the param's docstring, surfaced by the
- * panel on hover of the param's title.
+ * `description` is the param's docstring, surfaced by the panel on
+ * hover of the param's title; `unit` is the readout suffix ('Hz', 's')
+ * carried as first-class meta rather than baked into the label.
  */
 function num(
   value: number,
@@ -49,17 +50,18 @@ function num(
   max: number,
   label?: string,
   description?: string,
+  unit?: string,
 ): ParamSpec<number> {
   return {
     type: 'number',
-    slot: () => dial(value, { min, max, label, description }),
+    slot: () => dial(value, { min, max, label, description, unit }),
   }
 }
 
 /**
  * Like `num`, but the slider scales logarithmically — useful for any
  * quantity humans tune in log space (frequencies, time constants).
- * Requires min > 0. `description` is the param's hover docstring.
+ * Requires min > 0. `description` / `unit` as in `num`.
  */
 function logNum(
   value: number,
@@ -67,10 +69,11 @@ function logNum(
   max: number,
   label?: string,
   description?: string,
+  unit?: string,
 ): ParamSpec<number> {
   return {
     type: 'number',
-    slot: () => dial(value, { min, max, label, description, scale: 'log' }),
+    slot: () => dial(value, { min, max, label, description, unit, scale: 'log' }),
   }
 }
 
@@ -107,7 +110,7 @@ export const sine = defineStatefulSource({
   outType: 'number',
   polarity: 'bipolar',
   params: {
-    freq:  logNum(1, 0.01, 20, 'freq (Hz)', 'Cycles per second.'),
+    freq:  logNum(1, 0.01, 20, 'freq', 'Cycles per second.', 'Hz'),
     phase: num(0,  0,      6.2832, 'phase', 'Start offset, in radians.'),
   },
   body: () => {
@@ -129,7 +132,7 @@ export const tri = defineStatefulSource({
   outType: 'number',
   polarity: 'bipolar',
   params: {
-    freq:  logNum(1, 0.01, 20, 'freq (Hz)', 'Cycles per second.'),
+    freq:  logNum(1, 0.01, 20, 'freq', 'Cycles per second.', 'Hz'),
     phase: num(0,  0,      1,  'phase', 'Start offset, one full cycle = 1.'),
   },
   body: () => {
@@ -152,7 +155,7 @@ export const saw = defineStatefulSource({
   outType: 'number',
   polarity: 'bipolar',
   params: {
-    freq:  logNum(1, 0.01, 20, 'freq (Hz)', 'Cycles per second.'),
+    freq:  logNum(1, 0.01, 20, 'freq', 'Cycles per second.', 'Hz'),
     phase: num(0,  0,      1,  'phase', 'Start offset, one full cycle = 1.'),
   },
   body: () => {
@@ -175,7 +178,7 @@ export const square = defineStatefulSource({
   outType: 'number',
   polarity: 'bipolar',
   params: {
-    freq:  logNum(1, 0.01, 20, 'freq (Hz)', 'Cycles per second.'),
+    freq:  logNum(1, 0.01, 20, 'freq', 'Cycles per second.', 'Hz'),
     duty:  num(0.5, 0,      1, 'duty', 'Fraction of each cycle spent high.'),
     phase: num(0,   0,      1, 'phase', 'Start offset, one full cycle = 1.'),
   },
@@ -232,7 +235,7 @@ export const valueNoise = defineStatefulSource({
   polarity: 'bipolar',
   params: {
     seed: num(1, 1, 9999, 'seed', 'Picks the random stream — same seed, same noise.'),
-    rate: logNum(1, 0.01, 20, 'rate (pts/s)', 'New random points per second.'),
+    rate: logNum(1, 0.01, 20, 'rate', 'New random points per second.', 'pts/s'),
   },
   body: () => {
     const hash = (seed: number, n: number) => {
@@ -293,7 +296,7 @@ export const perlin1D = defineStatefulSource({
   polarity: 'bipolar',
   params: {
     seed: num(1, 1, 9999, 'seed', 'Picks the random stream — same seed, same noise.'),
-    rate: logNum(1, 0.01, 20, 'rate (units/s)', 'How fast the noise drifts.'),
+    rate: logNum(1, 0.01, 20, 'rate', 'How fast the noise drifts.', 'u/s'),
   },
   body: () => {
     let x = 0 // position accumulator, units
@@ -338,7 +341,7 @@ export const fbm = defineStatefulSource({
   polarity: 'bipolar',
   params: {
     seed:       num(1, 1,    9999, 'seed', 'Picks the random stream — same seed, same noise.'),
-    rate:       logNum(1, 0.01, 20, 'rate (units/s)', 'How fast the noise drifts.'),
+    rate:       logNum(1, 0.01, 20, 'rate', 'How fast the noise drifts.', 'u/s'),
     octaves:    num(4,   1,    6,    'octaves', 'How many layers of detail to stack.'),
     lacunarity: num(2,   1.01, 4,    'lacunarity', 'Frequency step between layers.'),
     gain:       num(0.5, 0.05, 0.95, 'gain', 'How much each finer layer contributes.'),
@@ -438,7 +441,7 @@ export const smooth = defineStatefulSource({
   polarity: 'bipolar',
   params: {
     signal: num(0, -1, 1, 'signal', 'The input to smooth — modulate it with a source.'),
-    tau:    logNum(0.1, 0.001, 5, 'tau (s)', 'Smoothing time — bigger lags more.'),
+    tau:    logNum(0.1, 0.001, 5, 'tau', 'Smoothing time — bigger lags more.', 's'),
   },
   body: () => {
     let y = NaN
@@ -529,7 +532,7 @@ export const gate = defineStatefulSource({
   params: {
     signal: num(0, -1, 1, 'signal', 'Passed through while open — modulate it with a source.'),
     closed: num(0, -1, 1, 'closed value', 'Held while the gate is shut.'),
-    period: num(1, 0.001, 60, 'period (s)', 'Seconds per open/close cycle.'),
+    period: num(1, 0.001, 60, 'period', 'Seconds per open/close cycle.', 's'),
     lo:     num(0, 0, 1, 'open at (frac)', 'Cycle fraction the gate opens at.'),
     hi:     num(0.5, 0, 1, 'close at (frac)', 'Cycle fraction the gate closes at.'),
   },

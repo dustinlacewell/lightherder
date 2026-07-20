@@ -87,6 +87,23 @@
   filter: drop-shadow(0 0 2px var(--chrome-accent-mod-glow));
 }
 
+/* Glide bar: a thin glide readout laid across the arc's bottom gap. The
+   rail is the unlit ground (like the track); the fill lights it left→
+   right in the brand light by the normalized glide amount. Static — no
+   pointer events. Rounded caps so short fills still read as a pill. */
+.chrome-knob-glide-rail {
+  stroke: var(--theme-lit-dim);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.chrome-knob-glide-fill {
+  stroke: var(--theme-lit-bright);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 1.5px var(--theme-lit-edge));
+}
+
 /* Cap: a small machined chrome part. The sheen gradient lives in the
    SVG defs; the rim and seated shadow live here. */
 .chrome-knob-cap {

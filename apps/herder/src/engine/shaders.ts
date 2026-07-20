@@ -1,3 +1,5 @@
+import { COMMON } from '../fx/glsl';
+
 /* The passes, as GLSL:
 
    camera  — the physical camera, every stage on a knob: rotation/zoom
@@ -14,22 +16,6 @@
    screen  — a device face blitted onto the editor canvas: rounded
              corners, vignette, scanlines. */
 
-const COMMON = /* glsl */ `
-float hash(vec2 p){
-  p = fract(p * vec2(234.34, 435.345));
-  p += dot(p, p + 34.23);
-  return fract(p.x * p.y);
-}
-vec3 hash3(vec2 p){
-  return vec3(hash(p), hash(p + 17.13), hash(p + 41.77));
-}
-float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-vec3 hueRotate(vec3 c, float a){
-  const vec3 k = vec3(0.57735);
-  float ca = cos(a);
-  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
-}
-`;
 
 /* the monitor/mixer shared tail: analog knobs, soft saturation,
    persistence, the spark */
@@ -55,14 +41,6 @@ vec3 screenTail(vec3 c, vec2 uv){
   return clamp(c, 0.0, 1.0);
 }
 `;
-
-export const FULL_VERT = /* glsl */ `#version 300 es
-out vec2 vUv;
-void main(){
-  vec2 v = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-  vUv = v;
-  gl_Position = vec4(v * 2.0 - 1.0, 0.0, 1.0);
-}`;
 
 export const CAMERA_FRAG = /* glsl */ `#version 300 es
 precision highp float;
@@ -255,6 +233,13 @@ void main(){
   else             c = 1.0 - min((1.0 - a) / max(b, 1e-3), vec3(1.0));
   frag = vec4(screenTail(c, vUv), 1.0);
 }`;
+
+export const COPY_FRAG = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 frag;
+uniform sampler2D uSrc;
+void main(){ frag = texture(uSrc, vUv); }`;
 
 export const QUAD_VERT = /* glsl */ `#version 300 es
 uniform vec2  uCenter;   /* px, origin top-left */

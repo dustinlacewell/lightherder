@@ -13,10 +13,10 @@ import { CPort, Shell, VPort } from './Shell';
    opens by asking the bench to descend into it */
 export const ModuleNav = createContext<((viewId: string, name: string) => void) | null>(null);
 
-/* IN/OUT come in two flavors; flipping one drops the device's wires
-   (they'd be the wrong signal kind). Outer wires into the module port
-   it defines are pruned when that level is next projected. */
-function FlavorBtn({ id, flavor }: { id: string; flavor: 'v' | 'c' }) {
+/* IN/OUT and the SWITCH come in two flavors; flipping one drops the
+   device's wires (they'd be the wrong signal kind). For an IN/OUT the
+   outer module-port wires are pruned when that level is next projected. */
+export function FlavorBtn({ id, flavor }: { id: string; flavor: 'v' | 'c' }) {
   return (
     <button
       className={`dev-btn nodrag flav-${flavor}`}
@@ -32,7 +32,7 @@ function FlavorBtn({ id, flavor }: { id: string; flavor: 'v' | 'c' }) {
    caches handle registrations per node, so it must be told to
    re-measure or drags from the port carry the stale id and fail
    kind-validation */
-function useFlavorHandles(id: string, flavor: 'v' | 'c'): void {
+export function useFlavorHandles(id: string, flavor: 'v' | 'c'): void {
   const upd = useUpdateNodeInternals();
   useEffect(() => { upd(id); }, [id, flavor, upd]);
 }

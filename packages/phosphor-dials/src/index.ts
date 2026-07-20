@@ -24,36 +24,16 @@ import {
 import { type PanelComponents } from '@ldlework/dials/react'
 
 import { sizedKnobSlider } from './KnobSlider'
-import { LerpControl } from './LerpControl'
 import { Row, makeRow, type Caption } from './Row'
 import { Heading } from './Heading'
 import { AttachControl } from './AttachControl'
 
 export { KnobSlider } from './KnobSlider'
-export { LerpControl } from './LerpControl'
 export { Row, makeRow, type Caption } from './Row'
 export { Heading } from './Heading'
 export { AttachControl } from './AttachControl'
 export { SourcePreview } from './SourcePreview'
 export { sourceIcon, SOURCE_ICONS, fallbackIcon, noneIcon } from './SourceIcons'
-
-/**
- * Phosphor-styled `PanelComponents` bundle. Pass directly to
- * `<Panel components={...}>` or spread to override individual slots.
- * The numeric-slot editor is a Knob rather than phosphor's linear
- * Slider — value-only when nothing is attached, riding the live
- * modulated output while a source drives the slot; the lerp control
- * is an ArcGauge.
- */
-/**
- * Layout mode for the modulation picker. `true` tucks the picker glyph
- * inside the knob face (center-bottom) and lets a right-click on the
- * dial open it; `false` restores the original layout with the picker in
- * the row's top-right corner. Flip this one flag to switch — the knob,
- * the Row, and the Panel's attach routing all key off it (via
- * `sliderHostsAttach`).
- */
-export const GLYPH_IN_DIAL = true
 
 /** Options for `makeDialPanelComponents`. */
 export interface DialPanelOptions {
@@ -66,11 +46,31 @@ export interface DialPanelOptions {
    * layout a dense node UI wants. See `Caption`.
    */
   caption?: Caption
+  /**
+   * Where the modulation picker lives. `'dial'` (default) tucks the
+   * picker glyph inside the knob face (center-bottom) and lets a
+   * right-click on the dial open it; `'row'` keeps the standalone
+   * trigger in the row's corner. The knob, the Row, and the Panel's
+   * attach routing all key off this (via `sliderHostsAttach`).
+   */
+  attachPlacement?: 'dial' | 'row'
+  /**
+   * The glide (`slot.glide`) in seconds that reads as a full glide bar
+   * under the knob. The host's own idea of "maximum glide" (herder: 3s);
+   * default 2s. dials/phosphor stay unitless — this is where the time
+   * scale is set.
+   */
+  glideMax?: number
 }
 
 /**
  * Build a phosphor-styled `PanelComponents` bundle. Pass `knobSize` to
  * fit tighter node UIs (herder's drawer knobs are 44px, globals 38px).
+ * The numeric-slot editor is a Knob rather than phosphor's linear
+ * Slider — value-only when nothing is attached, riding the live
+ * modulated output while a source drives the slot; the glide amount
+ * shows as a thin bar under the knob (the Knob's `glide` prop), edited
+ * by shift+right-drag when the slot opts in (`meta.glidable`).
  * Zero-config `dialPanelComponents` is `makeDialPanelComponents()`.
  */
 export function makeDialPanelComponents(
@@ -78,24 +78,22 @@ export function makeDialPanelComponents(
 ): PanelComponents {
   const below = opts.caption === 'below'
   return {
-    Slider: sizedKnobSlider(opts.knobSize, below),
+    Slider: sizedKnobSlider(opts.knobSize, below, opts.glideMax),
     NumberField,
     Dropdown,
     HelpTooltip,
     Row: below ? makeRow('below') : Row,
     Heading,
-    LerpControl,
-    // Icon-based source picker: glyph trigger + popover glyph grid,
-    // replicating the default's attach/swap/detach (and depth-carrying)
-    // logic over phosphor's IconPicker.
+    // Icon-based source picker: glyph trigger + popover glyph grid — a
+    // pure view over phosphor's IconPicker (dials binds the semantics).
     AttachControl,
     // The Knob carries its own lit readout, so numeric rows skip the
     // separate NumberField. It stays registered above for any contract
     // consumer that still wants one.
     sliderShowsValue: true,
-    // When on, the Knob hosts the attach picker in its face and the Row
-    // drops its corner cell (see GLYPH_IN_DIAL).
-    sliderHostsAttach: GLYPH_IN_DIAL,
+    // In 'dial' placement the Knob hosts the attach picker in its face
+    // and the Row drops its corner cell.
+    sliderHostsAttach: opts.attachPlacement !== 'row',
   }
 }
 

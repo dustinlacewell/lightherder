@@ -77,6 +77,13 @@ html, body, #root {
 .wire-ctl:hover .react-flow__edge-path { stroke: var(--teal); }
 
 .react-flow__connection-path { stroke: var(--maple); stroke-width: 2; }
+/* the cable being dragged dresses like the wire it will become */
+.wiring-v .react-flow__connection-path { stroke: var(--amber); }
+.wiring-c .react-flow__connection-path {
+  stroke: var(--teal);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
 
 .react-flow__handle {
   width: 11px;
@@ -111,7 +118,12 @@ html, body, #root {
 }
 .react-flow__node.selected .dev { border-color: var(--line2); box-shadow: 0 0 0 1px var(--line2), 0 6px 22px rgba(0,0,0,0.5); }
 
-.dev-switch { width: 96px; }
+/* wide enough for the name ("Switch"/"Moment…") beside the VID/CTL
+   flavor button, like an IN/OUT */
+.dev-switch { width: 150px; }
+/* the dial's base width; DialNode overrides it inline, widening by the
+   val's modulation depth so an expanded nested tree stays fully visible.
+   The c:out handle is anchored Position.Right, so it rides the edge. */
 .dev-dial { width: 110px; }
 .dev-xypad { width: 132px; }
 .dev-in, .dev-out { width: 150px; }
@@ -284,6 +296,18 @@ html, body, #root {
   text-align: center;
 }
 
+.media-url {
+  margin: 0 8px 8px;
+  padding: 4px 6px;
+  font-size: 9px;
+  background: #050403;
+  border: 1px solid #241c11;
+  border-radius: 4px;
+  color: var(--ink);
+  width: calc(100% - 16px);
+}
+.media-url::placeholder { color: var(--dim); }
+
 /* draw device */
 .draw-face { cursor: crosshair; touch-action: none; }
 .drawrows {
@@ -409,16 +433,19 @@ html, body, #root {
 .swbtn.lit { background: var(--line); color: var(--amber); border-color: var(--line2); }
 .swbtn.home:not(.lit) { border-style: dashed; }
 
-/* dial body — the big knob centered, its lerp gauge riding beside it.
-   The val knob is a dials SlotRow at 64px (the strip default sizes for
-   44px drawer knobs), so re-widen its slot column here. */
+/* dial body — the val knob is a dials SlotRow at 64px. Left-anchored
+   (not centered) so the knob keeps the SAME left/right position it had
+   centered in the original 110px node: the left padding reproduces that
+   inset — (110 − 76)/2 = 17px. As the node widens (DialNode grows it by
+   the val's modulation depth), the slot column grows RIGHTWARD to hold
+   the nested tree while the knob stays put. */
 .dialbody {
   position: relative;
   display: flex;
-  justify-content: center;
-  padding: 8px 0 10px;
+  justify-content: flex-start;
+  padding: 8px 8px 10px 17px;
 }
-.dialbody .dials-slot { width: 76px; }
+.dialbody .dials-slot { width: max-content; min-width: 76px; }
 .dialbody .arcgauge {
   transform: scale(80%);
   position: absolute;
@@ -426,19 +453,34 @@ html, body, #root {
   top: 0px;   /* arc rides the knob's 4-o'clock, level with its bottom rim */
 }
 
-/* XY pad body — the square field centered, its lerp gauge riding
-   beside it just like the dial's */
+/* XY pad body — the square field centered, its two lerp gauges (X and Y,
+   independent slew) stacked at the right edge */
 .xypadbody {
   position: relative;
   display: flex;
   justify-content: center;
   padding: 8px 0 10px;
 }
-.xypadbody .arcgauge {
-  transform: scale(80%);
+.xypad-lerps {
   position: absolute;
   right: -7px;
-  top: 34px;   /* level with the field's bottom-right corner */
+  top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* label each gauge X / Y so the two teal arcs read apart */
+.xypad-lerp {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.xypad-lerp .arcgauge { transform: scale(80%); }
+.xypad-lerp-tag {
+  font-size: 7px;
+  color: var(--dim);
+  letter-spacing: 0;
 }
 
 .xypad {
@@ -469,6 +511,17 @@ html, body, #root {
   pointer-events: none;
 }
 .xypad-puck.ridden { background: var(--teal); }
+/* the glided output puck: a hollow teal ring — the signal on the wire,
+   trailing the solid selection puck while a slew eases it in */
+.xypad-puck.out {
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  background: transparent;
+  border: 2px solid var(--teal);
+  box-shadow: none;
+  opacity: 0.85;
+}
 .xypad-vals {
   position: absolute;
   left: 4px;
@@ -575,20 +628,69 @@ html, body, #root {
   transform: translateY(-50%);
   z-index: 20;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 8px;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
   background: rgba(23, 18, 12, 0.92);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
-.tool {
-  width: 58px;
-  height: 34px;
+
+/* the category rail on the right edge — little vertical tabs,
+   reading top-down */
+.tool-tabs {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+.tool-tab {
+  flex: 0 0 auto;
+  writing-mode: vertical-rl;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 8px 3px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--maple);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.tool-tab:hover { color: var(--amber); }
+.tool-tab.on {
+  color: var(--amber);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+
+/* the active category's tools — one shared width so the panel holds
+   its footprint as tabs switch (the longest label sets it) */
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 112px;
+  max-height: 78vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.tool {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   gap: 5px;
+  padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel2);
@@ -596,6 +698,7 @@ html, body, #root {
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.08em;
+  white-space: nowrap;
   cursor: grab;
 }
 .tool:hover { border-color: var(--line2); color: var(--amber); }
@@ -1353,4 +1456,65 @@ html, body, #root {
 .presence-wire.ghost-ctl { stroke: var(--teal); }
 @keyframes presence-dash {
   to { stroke-dashoffset: -12; }
+}
+
+/* ── Keybind & gesture reference ─────────────────────────────────────
+   A read-only overlay listing the action catalog. The Modal frame and
+   Display glass are phosphor's; these rules own the catalog table. */
+.kb-modal { width: min(640px, calc(100vw - 48px)); }
+/* the scrollbar rides the true glass edge — padding lives on the
+   content wrapper INSIDE the scroll box, not on the scrolling box
+   itself, so the thumb doesn't sit inset from the screen */
+.kb-ref {
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+}
+.kb-ref-content { padding: 8px 12px; }
+.kb-section + .kb-section { margin-top: 18px; }
+.kb-section-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.kb-list { list-style: none; margin: 0; padding: 0; }
+.kb-row { padding: 7px 0; border-top: 1px solid var(--line); }
+.kb-row:first-child { border-top: none; }
+.kb-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kb-label { font-size: 13px; color: var(--maple); }
+.kb-desc {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.kb-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 7px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--amber);
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+}
+/* a gesture is descriptive, not a rebindable key — read it as softer */
+.kb-chip-gesture {
+  color: var(--maple);
+  border-style: dashed;
+}
+.kb-chip-fine {
+  font-size: 9px;
+  color: var(--dim);
+  font-family: inherit;
 }

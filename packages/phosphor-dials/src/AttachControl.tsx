@@ -7,11 +7,10 @@
  * source plus "none". Saves row width over the default text dropdown
  * and keeps the picker in the skeuomorphic hardware language.
  *
- * Attach/swap/detach logic mirrors dials' `DefaultAttachControl`
- * exactly: picking "none" detaches; picking a different source swaps
- * to a fresh instance — the modulation depth and mode live on the slot
- * and survive the swap on their own, so the envelope the user dialed in
- * is preserved; picking the current source is a no-op.
+ * A PURE VIEW of dials' `AttachControlProps`: selection, mode, and
+ * candidates in; `onPick`/`onMode` out. The Panel's SlotRow binds those
+ * to `SlotActions`, so attach/swap/detach semantics (and a host's op
+ * mediation) live upstream — this control cannot touch a slot.
  *
  * The picker popover always carries a footer: a compact three-option
  * segment (center / up / down) driving the slot's modulation mode, lit
@@ -29,7 +28,7 @@
 
 import type { ReactNode } from 'react'
 import { type ModMode, type SourceDef } from '@ldlework/dials'
-import { useSlotActions, type AttachControlProps } from '@ldlework/dials/react'
+import { type AttachControlProps } from '@ldlework/dials/react'
 import { HoverCard, IconPicker, type IconPickerOption } from '@ldlework/phosphor'
 import { MODE_ICONS, noneIcon, sourceIcon } from './SourceIcons'
 import { SourcePreview } from './SourcePreview'
@@ -96,51 +95,29 @@ function ModeFooter({
 }
 
 /**
- * Extra props beyond the dials contract — supplied only when a host
- * (the KnobSlider hosting the glyph in the dial) drives the popover's
- * open state externally, so a right-click on the dial can open it.
- * Omitted in the standalone row layout, where the picker manages its
- * own open state.
- *
- * `inDial` switches to the on-dial presentation: no trigger button —
- * the current source's glyph is painted as an inert SVG on the dial
- * face (by the host), and the popover is opened purely by the host's
- * right-click. `currentGlyph` exposes that glyph so the host can place
- * it; `AttachGlyph` below renders it.
- */
-interface HostedAttachProps {
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  inDial?: boolean
-}
-
-/**
  * The inert on-dial modulation glyph — the current source's waveform
  * (or the "none" mark). Pure SVG, pointer-events off, so the right-
  * click that opens the picker passes straight through to the dial.
  */
 export function AttachGlyph({
-  slot,
+  current,
 }: {
-  slot: AttachControlProps['slot']
+  current: string | null
 }): ReactNode {
-  const name = slot.attached?.def.name ?? ''
   return (
     <span
-      className={`pd-knob-glyph ${slot.attached ? 'is-attached' : ''}`}
+      className={`pd-knob-glyph ${current ? 'is-attached' : ''}`}
       aria-hidden="true"
     >
-      {name ? sourceIcon(name) : noneIcon}
+      {current ? sourceIcon(current) : noneIcon}
     </span>
   )
 }
 
 export function AttachControl({
-  path = [], slot, candidates, onChange, open, onOpenChange, inDial = false,
-}: AttachControlProps & HostedAttachProps): ReactNode {
-  const actions = useSlotActions()
-  if (candidates.length === 0 && !slot.attached) return null
-  const current = slot.attached?.def.name ?? ''
+  current, mode, candidates, onPick, onMode, hosted,
+}: AttachControlProps): ReactNode {
+  if (candidates.length === 0 && !current) return null
   const currentDef = candidates.find((d) => d.name === current)
   const options: IconPickerOption[] = [
     {
@@ -156,44 +133,35 @@ export function AttachControl({
       hover: sourceHover(d),
     })),
   ]
+  // Hosted ⇔ in-dial: when a slider hosts this control it owns the open
+  // state and paints the glyph on the dial face — no trigger button; the
+  // popover is opened purely by the host's right-click. Standalone rows
+  // keep the classic trigger + self-managed popover.
+  const inDial = hosted !== undefined
   const picker = (
     <IconPicker
-      className={`pd-attach-picker ${slot.attached ? 'is-attached' : ''} ${inDial ? 'pd-attach-indial' : ''}`}
+      className={`pd-attach-picker ${current ? 'is-attached' : ''} ${inDial ? 'pd-attach-indial' : ''}`}
       label="Modulation source"
-      value={current}
+      value={current ?? ''}
       options={options}
       // The trigger peeks the CURRENT selection's card — same card as
       // its grid cell, live trace included — not a generic explainer.
       // In-dial mode has no trigger, so the peek is off there.
       hoverContent={inDial ? undefined : currentDef ? sourceHover(currentDef) : noneHover}
-      open={open}
-      onOpenChange={onOpenChange}
+      open={hosted?.open}
+      onOpenChange={hosted?.onOpenChange}
       hideTrigger={inDial}
-      footer={
-        <ModeFooter
-          mode={slot.modMode}
-          onPick={(m) => {
-            actions.setMode(path, slot, m)
-            onChange()
-          }}
-        />
-      }
-      onChange={(name) => {
-        // Depth and mode live on the slot and survive a swap on their
-        // own. `attach` handles detach (null), no-op (same name), and
-        // swap-to-fresh; the mediator (or the default) performs it.
-        actions.attach(path, slot, name || null)
-        onChange()
-      }}
+      footer={<ModeFooter mode={mode} onPick={onMode} />}
+      // `onPick` handles detach (null), no-op (same name), and
+      // swap-to-fresh upstream — depth and mode live on the slot and
+      // survive a swap on their own. This control is a pure view.
+      onChange={(name) => onPick(name || null)}
     />
   )
 
-  // In-dial: the inert glyph is painted on the dial face and the
-  // triggerless popover hangs off the same anchor. The standalone
-  // layout is just the picker (trigger + popover) as before.
   return inDial ? (
     <>
-      <AttachGlyph slot={slot} />
+      <AttachGlyph current={current} />
       {picker}
     </>
   ) : (

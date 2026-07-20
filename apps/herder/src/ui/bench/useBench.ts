@@ -12,7 +12,7 @@ import {
   slotsFor, sweepEntryVals, treeToSnap, unproject, validConnection, viewContext, type Crumb, type InstVals, type SubPatch, type ViewCtx,
 } from '../../patch';
 import { libStore } from '../../persist';
-import { consumeEcho, dispatch, mirror, record, registerApplier, releaseNode } from '../../runtime';
+import { consumeEcho, dispatch, mirror, parkNode, record, registerApplier, releaseNode } from '../../runtime';
 import { announcePresence } from '../../session';
 import * as midi from '../../midi';
 import { bootRoot, bootView } from './boot';
@@ -46,6 +46,10 @@ export interface Bench {
   level: () => SubPatch | null;
   root: () => SubPatch;
   rebuild: (next: SubPatch) => void;
+  /** structural edits React Flow applied itself (spawn, paste) call this
+      so the mirror's flat compile catches up — the same compensation
+      handleNodesChange makes for RF-applied removals */
+  bumpDoc: () => void;
 }
 
 /* a placeholder scope on a recorded op — record()'s canonicalize-only
@@ -187,14 +191,17 @@ export function useBench(): Bench {
   /* a recompile that drops nodes from the engine — above all the solo
      swap, which parks a whole graph in one step — must release their
      rings, faces and gestures, or they linger against ids the engine no
-     longer runs. Removals inside a level are already released at their
-     call sites; releaseNode is idempotent, so the overlap is free. */
+     longer runs. PARK, not release: this diff can't tell a benched
+     graph from a departed node, and a park must never burn stored
+     media (the solo swap comes back). Genuine removals get their
+     destructive release at their own call sites; parkNode is
+     idempotent, so the overlap is free. */
   useEffect(() => {
     const prev = prevFlatRef.current;
     prevFlatRef.current = flat;
     if (!prev || prev === flat) return;
     const live = new Set(flat.nodes.map(n => n.id));
-    for (const n of prev.nodes) if (!live.has(n.id)) releaseNode(n.id);
+    for (const n of prev.nodes) if (!live.has(n.id)) parkNode(n.id);
   }, [flat]);
 
   /* flush the entry write-back's library touch after the render that
@@ -467,7 +474,7 @@ export function useBench(): Bench {
 
   return {
     nodes, edges, setNodes, setEdges, handleNodesChange, handleEdgesChange, onConnect, isValid,
-    flat, path, prefix, strip, enter, enterLib, jump, goTo, level, root, rebuild,
+    flat, path, prefix, strip, enter, enterLib, jump, goTo, level, root, rebuild, bumpDoc,
   };
 }
 

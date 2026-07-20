@@ -22,22 +22,30 @@
    passes (renderer.ts), and the overlay painting (blitter.ts). */
 
 import { read, sampleSlot, type Ctx, type Slot } from '@ldlework/dials';
-import type { GLC } from '../gl/context';
-import { Ring } from '../gl/ring';
-import { RES_STEPS, type PatchNode } from '../patch';
-import { dropStoredMediaUnder } from '../persist';
-import { flushLive, mirror, sampleSpark, transport } from '../runtime';
+import { TextureRing } from '@ldlework/gl';
+import type { GLC } from './context';
+import { DELAY_MAX, RES_STEPS, type PatchNode } from '../patch';
+import { dropStoredMediaUnder, dropStoredMediaUrl } from '../persist';
+import { flushLive, mirror, notifyTick, sampleSpark, transport } from '../runtime';
 import { Blitter } from './blitter';
+import { FX, FX_KINDS } from '../fx';
 import { StampBank } from './stamps';
 import { clampInt, paramValue, slotValue } from './params';
 import { DeviceRenderer, type CameraParams, type ScreenParams } from './renderer';
 import { DrawSource } from './sources/draw';
 import { MediaSource } from './sources/media';
+import { WebcamSource } from './sources/webcam';
 import { Wiring } from './wiring';
 
 const RING_DEPTH = 6;
 
-const isProc = (n: PatchNode) => n.type === 'camera' || n.type === 'monitor' || n.type === 'mixer';
+/* how many ticks the delay store waits below capacity before letting
+   the memory go — long enough that a knob sweep never thrashes the
+   allocator, short enough that a moment at 60 frames doesn't hold
+   hundreds of megabytes for the rest of the session */
+const DELAY_SHRINK_TICKS = 120;
+
+const isProc = (n: PatchNode) => n.type === 'camera' || n.type === 'monitor' || n.type === 'mixer' || n.type === 'delay' || FX_KINDS.has(n.type);
 
 /** a transport global's current value, off its (unmodulated) slot */
 function globalNum(key: string): number {
@@ -54,8 +62,9 @@ function sampleTree(n: PatchNode, ctx: Ctx): void {
 }
 
 export class Engine {
-  private rings = new Map<string, Ring>();
+  private rings = new Map<string, TextureRing>();
   private media = new Map<string, MediaSource>();
+  private webcams = new Map<string, WebcamSource>();
   private draws = new Map<string, DrawSource>();
 
   private renderer: DeviceRenderer;
@@ -85,11 +94,17 @@ export class Engine {
 
   /* ---- lifecycle ------------------------------------------------------ */
 
-  private ringFor(id: string): Ring {
+  private ringFor(id: string): TextureRing {
     let r = this.rings.get(id);
     if (!r) {
-      r = new Ring(this.g, this.texW, this.texH, RING_DEPTH);
-      r.clearAll(this.renderer.fbo);
+      const gl = this.g.gl;
+      r = new TextureRing(gl, {
+        width: this.texW, height: this.texH, depth: RING_DEPTH,
+        internalFormat: this.g.ifmt, format: gl.RGBA, type: this.g.type,
+        filter: gl.LINEAR,
+      });
+      /* alpha 0.25 = AGC gain 1.0 for camera rings (alpha carries the state) */
+      r.clearAll(this.renderer.fbo, [0, 0, 0, 0.25]);
       this.rings.set(id, r);
     }
     return r;
@@ -104,6 +119,15 @@ export class Engine {
     return m;
   }
 
+  private webcamFor(id: string): WebcamSource {
+    let w = this.webcams.get(id);
+    if (!w) {
+      w = new WebcamSource(this.g);
+      this.webcams.set(id, w);
+    }
+    return w;
+  }
+
   /** the draw node's paint surface — the UI strokes it, videoIn reads it */
   drawFor(id: string): DrawSource {
     let d = this.draws.get(id);
@@ -114,22 +138,56 @@ export class Engine {
     return d;
   }
 
-  /** a node left the graph — release its GPU state and forget its
-      stored media (node ids are never reused, so an orphaned entry
-      would just sit in IndexedDB forever). A module's compiled inner
-      nodes live under "<id>/…", so the sweep covers the prefix too. */
-  dropNode(id: string): void {
+  /** a node left the RUNNING graph but not the document — a view swap
+      parked it (the solo drill of a library entry benches the whole
+      doc graph). Release everything live — rings, media textures, draw
+      surfaces, stamp state — but leave IndexedDB alone: when the node
+      returns, mediaFor() reboots its MediaSource and the stored blob
+      hydrates it right back. A module's compiled inner nodes live
+      under "<id>/…", so the sweep covers the prefix too. */
+  parkNode(id: string): void {
     const under = (k: string) => k === id || k.startsWith(id + '/');
     for (const [k, r] of [...this.rings]) if (under(k)) { r.dispose(); this.rings.delete(k); }
+    for (const [k, r] of [...this.delayIns]) if (under(k)) { r.dispose(); this.delayIns.delete(k); this.delayIdle.delete(k); }
+    for (const k of [...this.fxState.keys()]) if (under(k)) this.fxState.delete(k);
     for (const k of [...this.media.keys()]) if (under(k)) this.media.delete(k);   // texture is small; let GC of the map entry suffice
+    for (const [k, w] of [...this.webcams]) if (under(k)) { w.dispose(); this.webcams.delete(k); }
     for (const k of [...this.draws.keys()]) if (under(k)) this.draws.delete(k);
     this.dials.dropUnder(id);
+  }
+
+  /** a node left the graph FOR GOOD — park it, and forget its stored
+      media too (node ids are never reused, so an orphaned entry would
+      just sit in IndexedDB forever). */
+  dropNode(id: string): void {
+    this.parkNode(id);
     dropStoredMediaUnder(id).catch(() => { /* best-effort cleanup */ });
+    dropStoredMediaUrl(id);
   }
 
   /** load dropped media into a media node, remembering it for next boot */
   loadMedia(id: string, file: Blob): Promise<void> {
     return this.mediaFor(id).load(file);
+  }
+
+  /** point a media node at a remote video URL instead of a dropped file */
+  loadMediaUrl(id: string, url: string): Promise<void> {
+    return this.mediaFor(id).loadUrl(url);
+  }
+
+  /** ask for the camera and start a webcam node's stream — must run
+      from a user gesture (the face click) */
+  startWebcam(id: string): Promise<void> {
+    return this.webcamFor(id).start();
+  }
+
+  /** release a webcam node's stream without dropping the node */
+  stopWebcam(id: string): void {
+    this.webcams.get(id)?.stop();
+  }
+
+  webcamLive(id: string): boolean {
+    return this.webcams.get(id)?.live ?? false;
   }
 
   /** switch the loops' internal resolution — every ring reallocates and
@@ -139,26 +197,27 @@ export class Engine {
     if (w === this.texW && h === this.texH) return;
     for (const r of this.rings.values()) r.dispose();
     this.rings.clear();
+    for (const r of this.delayIns.values()) r.dispose();
+    this.delayIns.clear();
+    this.delayIdle.clear();
     this.texW = w; this.texH = h;
     this.renderer.setSize(w, h);
   }
 
   clearAll(): void {
-    for (const r of this.rings.values()) r.clearAll(this.renderer.fbo);
+    for (const r of this.rings.values()) r.clearAll(this.renderer.fbo, [0, 0, 0, 0.25]);
+    for (const r of this.delayIns.values()) r.clearAll(this.renderer.fbo, [0, 0, 0, 1]);
   }
 
   /* ---- the frame ------------------------------------------------------ */
 
   step(now: number, viewW: number, viewH: number): void {
-    if (!transport.frozen) {
-      for (const m of this.media.values()) m.update();
-      if (now >= this.nextTick) {
-        /* steady cadence while keeping up; re-anchor after a stall
-           (hidden tab) instead of bursting missed ticks */
-        const frameMs = 1000 / globalNum('video');
-        this.nextTick = this.nextTick + frameMs > now ? this.nextTick + frameMs : now + frameMs;
-        this.tick();
-      }
+    if (!transport.frozen && now >= this.nextTick) {
+      /* steady cadence while keeping up; re-anchor after a stall
+         (hidden tab) instead of bursting missed ticks */
+      const frameMs = 1000 / globalNum('video');
+      this.nextTick = this.nextTick + frameMs > now ? this.nextTick + frameMs : now + frameMs;
+      this.tick();
     }
     this.blitter.blit(now, viewW, viewH, this.texOf, this.simTime, this.ticks);
   }
@@ -166,18 +225,21 @@ export class Engine {
   /** the step-debugger: advance the frozen bench by exactly one video
       frame — one hop of light through every device */
   tickOnce(): void {
-    for (const m of this.media.values()) m.update();
     this.tick();
   }
 
   private tick(): void {
+    /* sources upload at TICK rate — the bench consumes frames no
+       faster, so pushing video bytes every rAF was pure bus traffic */
+    for (const m of this.media.values()) m.update();
+    for (const w of this.webcams.values()) w.update();
     this.ticks++;
     const dt = 1 / globalNum('video');
     this.simTime += dt;
 
     /* THE sampling pass: the engine is the sole sampler. One sampleSlot
        walk per node's slot tree per tick advances every stateful source
-       exactly once, applies each slot's meta.lerp glide in sim-time, and
+       exactly once, applies each slot's glide in sim-time, and
        writes every `lastSample` — the resolved (glided + modulated) value
        every downstream reader (paramValue, StampBank, stepMixer, the UI's
        lastSample poll) consumes. Globals sampled too (they carry no
@@ -200,11 +262,14 @@ export class Engine {
     for (const n of procs) {
       if (n.type === 'camera') this.stepCamera(n);
       else if (n.type === 'monitor') this.stepMonitor(n);
+      else if (n.type === 'delay') this.stepDelay(n);
+      else if (FX_KINDS.has(n.type)) this.stepEffect(n);
       else this.stepMixer(n);
       this.stepped.add(n.id);
     }
     for (const n of procs) this.rings.get(n.id)!.advance();
     flushLive();
+    notifyTick();
   }
 
   /* order the processors so every delay-0 consumer runs after its
@@ -214,7 +279,6 @@ export class Engine {
     const deps = new Map<string, string[]>();
     for (const n of procs) {
       if (n.type === 'camera') continue;   // a camera always charges its frame
-      if (clampInt(this.pv(n, 'delay'), 0, RING_DEPTH - 1) !== 0) continue;
       const ds: string[] = [];
       for (const h of n.type === 'mixer' ? ['v:a', 'v:b'] : ['v:in']) {
         const src = this.wiring.producerOf(n.id, h);
@@ -254,6 +318,7 @@ export class Engine {
     const src = this.wiring.producerOf(target, handle);
     if (!src) return this.renderer.black;
     if (src.type === 'media') return this.mediaFor(src.data.mediaKey ?? src.id).tex;
+    if (src.type === 'webcam') return this.webcamFor(src.id).tex;
     if (src.type === 'draw') return this.drawFor(src.id).tex;
     if (!isProc(src)) return this.renderer.black;
     if (delay === 0)
@@ -264,6 +329,7 @@ export class Engine {
   /** what the blitter (face wells, preview, popout) shows for a node */
   private texOf = (n: PatchNode, tap: number): WebGLTexture | null =>
     n.type === 'media' ? this.mediaFor(n.data.mediaKey ?? n.id).tex
+      : n.type === 'webcam' ? this.webcamFor(n.id).tex
       : n.type === 'draw' ? this.drawFor(n.id).tex
       : isProc(n) ? this.ringFor(n.id).at(tap)
       : null;
@@ -296,19 +362,79 @@ export class Engine {
 
   private stepMonitor(n: PatchNode): void {
     const ring = this.ringFor(n.id);
-    /* delay 0 = an analog wire (same-tick passthrough); 1 = one digital
-       hop; more = the converters in this path */
-    const delay = clampInt(this.pv(n, 'delay'), 0, RING_DEPTH - 1);
-    this.renderer.monitor(ring.next, this.videoIn(n.id, 'v:in', delay), ring.at(0), this.screenParams(n));
+    this.renderer.monitor(ring.next, this.videoIn(n.id, 'v:in', 0), ring.at(0), this.screenParams(n));
+  }
+
+  /* effects are analog wires: same-tick passthrough, no buffering —
+     time lives in the delay device. The def's uniforms() turns the
+     resolved knobs into shader values; per-node scratch (phase
+     accumulators and the like) lives in fxState. */
+  private fxState = new Map<string, Record<string, unknown>>();
+
+  private stepEffect(n: PatchNode): void {
+    const ring = this.ringFor(n.id);
+    const def = FX[n.type as keyof typeof FX];
+    let st = this.fxState.get(n.id);
+    if (!st) { st = {}; this.fxState.set(n.id, st); }
+    const vals = def.uniforms(k => this.pv(n, k), { simTime: this.simTime, state: st });
+    this.renderer.effect(n.type, ring.next, this.videoIn(n.id, 'v:in', 0), { uTime: this.simTime, ...vals });
+  }
+
+  /* the delay line records its input every tick into its own store,
+     and plays back the frame from N ticks ago — buffering that works
+     against ANY producer, media included (a monitor's delay knob can
+     only tap a ring-bearing device's history) */
+  private delayIns = new Map<string, TextureRing>();
+  private delayIdle = new Map<string, number>();
+
+  /* the store follows the knob's reach: turning FRAMES past the buffer
+     reallocates it now (clearing held history; it refills over the next
+     N ticks), and a store sitting below capacity for DELAY_SHRINK_TICKS
+     reallocates down, releasing the memory a passing sweep to 60 grabbed.
+     It records verbatim copies for playback, so it rides in RGBA8 — a
+     quarter of the half-float loop rings' footprint; loop values outside
+     [0,1] clamp on the way in. */
+  private delayInFor(id: string, depth: number): TextureRing {
+    let r = this.delayIns.get(id);
+    if (r && r.depth !== depth) {
+      const idle = r.depth > depth ? (this.delayIdle.get(id) ?? 0) + 1 : 0;
+      if (r.depth < depth || idle > DELAY_SHRINK_TICKS) {
+        r.dispose(); this.delayIns.delete(id); r = undefined;
+      } else {
+        this.delayIdle.set(id, idle);
+      }
+    } else {
+      this.delayIdle.delete(id);
+    }
+    if (!r) {
+      const gl = this.g.gl;
+      r = new TextureRing(gl, {
+        width: this.texW, height: this.texH, depth,
+        internalFormat: gl.RGBA8, format: gl.RGBA, type: gl.UNSIGNED_BYTE,
+        filter: gl.LINEAR,
+      });
+      r.clearAll(this.renderer.fbo, [0, 0, 0, 1]);
+      this.delayIns.set(id, r);
+      this.delayIdle.delete(id);
+    }
+    return r;
+  }
+
+  private stepDelay(n: PatchNode): void {
+    const ring = this.ringFor(n.id);
+    const frames = clampInt(this.pv(n, 'frames'), 0, DELAY_MAX);
+    const ins = this.delayInFor(n.id, frames + 1);
+    this.renderer.copy(ins.next, this.videoIn(n.id, 'v:in', 0));
+    ins.advance();
+    this.renderer.copy(ring.next, ins.at(Math.min(frames, ins.depth - 1)));
   }
 
   private stepMixer(n: PatchNode): void {
     const ring = this.ringFor(n.id);
-    const delay = clampInt(this.pv(n, 'delay'), 0, RING_DEPTH - 1);
     this.renderer.mixer(
       ring.next,
-      this.videoIn(n.id, 'v:a', delay),
-      this.videoIn(n.id, 'v:b', delay),
+      this.videoIn(n.id, 'v:a', 0),
+      this.videoIn(n.id, 'v:b', 0),
       ring.at(0),
       slotValue(n, 'mode'),
       this.pv(n, 'keylvl'),

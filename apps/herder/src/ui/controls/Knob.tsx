@@ -208,10 +208,14 @@ export function Knob({ def: P, value, onChange, size = 44, midiTarget, shift, po
 export interface XYPadProps {
   defX: ParamDef; x: number; onX: (v: number) => void; midiX?: string;
   defY: ParamDef; y: number; onY: (v: number) => void; midiY?: string;
+  /** the glided/lerped OUTPUT actually riding the wire — drawn as a
+      second ghost puck lagging the selection while a slew is dialed in.
+      Omit (or leave equal to x/y) for no lag puck. */
+  outX?: number; outY?: number;
   size?: number;
 }
 
-export function XYPad({ defX, x, onX, midiX, defY, y, onY, midiY, size = 96 }: XYPadProps) {
+export function XYPad({ defX, x, onX, midiX, defY, y, onY, midiY, outX, outY, size = 96 }: XYPadProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   /* drag is relative and pointer-LOCKED: the press grabs the mouse
      (the OS cursor freezes and hides) and movementX/Y deltas
@@ -291,6 +295,13 @@ export function XYPad({ defX, x, onX, midiX, defY, y, onY, midiY, size = 96 }: X
   const ty = 1 - (shownY - defY.min) / (defY.max - defY.min);
   const ridden = riddenX !== undefined || riddenY !== undefined;
 
+  /* the glided output as a second, lagging puck — only when it visibly
+     diverges from the selection (a slew is easing it toward the knob) */
+  const ox = outX ?? shownX, oy = outY ?? shownY;
+  const lagging = Math.abs(ox - shownX) > 1e-4 || Math.abs(oy - shownY) > 1e-4;
+  const gx = (ox - defX.min) / (defX.max - defX.min);
+  const gy = 1 - (oy - defY.min) / (defY.max - defY.min);
+
   return (
     <div
       ref={rootRef}
@@ -319,6 +330,13 @@ export function XYPad({ defX, x, onX, midiX, defY, y, onY, midiY, size = 96 }: X
       onDoubleClick={e => { e.stopPropagation(); setX(defX.def); setY(defY.def); }}
     >
       <div className="xypad-cross" />
+      {lagging && (
+        <div
+          className="xypad-puck out"
+          title="the glided output riding the wire — lags the selection while a slew is set"
+          style={{ left: `${Math.min(1, Math.max(0, gx)) * 100}%`, top: `${Math.min(1, Math.max(0, gy)) * 100}%` }}
+        />
+      )}
       <div
         className={`xypad-puck${ridden ? ' ridden' : ''}`}
         style={{ left: `${Math.min(1, Math.max(0, tx)) * 100}%`, top: `${Math.min(1, Math.max(0, ty)) * 100}%` }}

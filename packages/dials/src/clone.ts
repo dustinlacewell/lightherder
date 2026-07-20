@@ -11,14 +11,15 @@
  *
  * `cloneSlot` produces a fresh slot with:
  *   - a fresh `dial` (copied value / initial / meta — meta is shared by
- *     reference, since it is code-owned, immutable UI metadata),
- *   - the same `modDepth` / `modMode` (plain values),
+ *     reference, since it is code-owned, immutable UI metadata; all
+ *     user-tunable state lives on the slot),
+ *   - the same `modDepth` / `modMode` / `glide` (plain values),
  *   - a fresh `Source` (via `instantiate`, so stateful bodies get their
  *     own closure) whose sub-slots are themselves cloned recursively,
  *     carrying over each sub-slot's value / depth / mode.
  *
  * The result is independent: sampling the clone never advances the
- * original's sources and vice versa. `lastSample` / `_lerpY` are NOT
+ * original's sources and vice versa. `lastSample` / `_glideY` are NOT
  * copied — they are sampler scratch, seeded fresh on first sample.
  */
 
@@ -39,6 +40,7 @@ export function cloneSlot<T>(slot: Slot<T>): Slot<T> {
     attached: slot.attached ? cloneSource(slot.attached) : null,
     modDepth: slot.modDepth,
     modMode: slot.modMode,
+    glide: slot.glide,
   }
   return out
 }
@@ -57,12 +59,13 @@ function cloneSource<T>(
   return fresh
 }
 
-/** Copy one slot's tunable state (value, depth, mode, and its own
-    attachment subtree) onto a fresh default slot from `instantiate`. */
+/** Copy one slot's tunable state (value, depth, mode, glide, and its
+    own attachment subtree) onto a fresh default slot from `instantiate`. */
 function copyState(from: Slot<unknown>, to: Slot<unknown>): void {
   to.dial.value = from.dial.value
   to.modDepth = from.modDepth
   to.modMode = from.modMode
+  to.glide = from.glide
   to.attached = from.attached ? cloneSource(from.attached) : null
 }
 

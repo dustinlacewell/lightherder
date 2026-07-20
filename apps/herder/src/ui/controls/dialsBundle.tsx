@@ -79,9 +79,10 @@ export function useSlotNode(): SlotNode | null {
 /* every slot mutation the Panel would make directly becomes the op that
    names it; the applier performs the real dials mutation on the live
    tree (aliased into the mirror, so the engine feels it same-tick).
-   `setLerp` is a no-op: a device drawer param has no glide story (its
-   slot carries no meta.lerp, so phosphor never renders the control) —
-   only dial/xypad axes glide, and those stay bespoke widgets.
+   The glide gesture (shift+right-drag) sets a dial's `lerp` param; a
+   drawer param never glides, so its knob carries no glide gesture at all
+   (the Panel only passes onGlide for a `meta.glidable` slot) — the bar
+   under the knob just DISPLAYS the amount.
 
    Doc-level drawer gestures ride the SILENT route, exactly as a MIDI CC
    does: the op writes the tree in place (aliased into the mirror at the
@@ -103,7 +104,13 @@ function herderActions(id: string): Partial<SlotActions> {
       dispatch({ kind: 'slotDepth', scope: at(), node: id, key: keyOf(path), depth }, opts),
     setMode: (path, _slot, mode) =>
       dispatch({ kind: 'slotMode', scope: at(), node: id, key: keyOf(path), mode }, opts),
-    setLerp: () => {},
+    /* glide gesture (shift+right-drag on the val knob). herder stores a
+       dial's glide as its sibling `lerp` PARAM, which StampBank mirrors
+       onto the val slot's `glide` state — so the gesture writes that
+       param, not the slot directly. Only the dial's val is glidable
+       (meta.glidable via PARAMS), so this only ever fires there. */
+    setGlide: (_path, _slot, seconds) =>
+      dispatch({ kind: 'setParam', scope: at(), node: id, key: 'lerp', v: seconds }, opts),
   };
 }
 
@@ -118,7 +125,7 @@ function fullActions(a: Partial<SlotActions>): SlotActions {
     attach: a.attach ?? noop,
     setDepth: a.setDepth ?? noop,
     setMode: a.setMode ?? noop,
-    setLerp: a.setLerp ?? noop,
+    setGlide: a.setGlide ?? noop,
   };
 }
 
@@ -179,17 +186,25 @@ export function liveOverrideFor(id: string): LiveOverride {
 
 /* ---- the root bundle: phosphor visuals + herder chrome ----------------- */
 
+/* glide seconds that read as a full glide bar — herder's dial/xypad lerp
+   param tops out at 3s (PARAMS.dial.lerp.max), so a fully-glided dial
+   fills the bar. An app setting later. */
+const GLIDE_MAX = 3;
+
 /** the components every device strip renders through — provided once at
     the bench root (Bench.tsx). Static: no node identity, no ops. */
 export const herderPanelComponents = {
-  ...makeDialPanelComponents({ knobSize: 44, caption: 'below' }),
+  ...makeDialPanelComponents({ knobSize: 44, caption: 'below', glideMax: GLIDE_MAX }),
   SlotChrome,
 };
 
 /** the bundle for a slot that IS a node's face (the dial's val) — the
     same chrome at the bespoke knob's 64px, provided locally over the
-    bench bundle where such a control renders. */
+    bench bundle where such a control renders. The dial's glide shows as
+    the knob's own glide bar (the engine mirrors the dial's `lerp` param
+    onto the val slot's `glide` state every tick — StampBank.step),
+    edited by shift+right-drag on the knob. */
 export const dialFaceComponents = {
-  ...makeDialPanelComponents({ knobSize: 64, caption: 'below' }),
+  ...makeDialPanelComponents({ knobSize: 64, caption: 'below', glideMax: GLIDE_MAX }),
   SlotChrome,
 };

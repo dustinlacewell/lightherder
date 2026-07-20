@@ -15,7 +15,7 @@
    in slot PATHS and in whole-tree snap overlays. */
 
 import {
-  adoptBody, attachFrom, cloneSlot, detach, fromJSON, getSource, setDepth, setDial, setMode, toJSON,
+  adoptBody, attachFrom, cloneSlot, detach, fromJSON, getSource, rebaseSlot, setDepth, setDial, setMode, toJSON,
   type Dials, type DialsSnap, type Slot, type SlotSnap,
 } from '@ldlework/dials';
 import { slotFor, type ParamDef } from './params';
@@ -66,10 +66,20 @@ export function cloneTree(slots: Dials): Dials {
   return out;
 }
 
+/** re-home a cloned tree: every slot's reset target becomes the value
+    it was cloned WITH — the prototype's current state. An instance's
+    knobs inherit the library definition as their defaults, so a
+    double-click reset lands on the entry's live value, not the kind's
+    factory default. Runs before instance overlays hydrate, which touch
+    values only, never the home. */
+export function rebaseTree(slots: Dials): void {
+  for (const k in slots) rebaseSlot(slots[k] as Slot<unknown>);
+}
+
 /** adopt sampler continuity from the RETIRING clone of the same logical
     slot tree onto its freshly compiled successor: each surviving
     attachment's stateful body (an LFO's phase, a filter's memory — dials'
-    adoptBody), plus lastSample / _lerpY so the display and lerp easing
+    adoptBody), plus lastSample / _glideY so the display and glide easing
     don't blink between the recompile and the next engine tick. Values
     stay the successor's own (the freshly merged canon); a slot whose
     attachment CHANGED keeps its fresh source — that restart is the edit's
@@ -84,7 +94,7 @@ export function adoptTreeState(prev: Dials, next: Dials): void {
 function adoptSlotState(prev: Slot<unknown>, next: Slot<unknown>): void {
   if (prev === next) return;                     // aliased (a root node) — nothing diverged
   if (next.lastSample === undefined) next.lastSample = prev.lastSample;
-  if (next._lerpY === undefined) next._lerpY = prev._lerpY;
+  if (next._glideY === undefined) next._glideY = prev._glideY;
   if (!prev.attached || !next.attached || prev.attached.def !== next.attached.def) return;
   adoptBody(prev.attached, next.attached);
   for (const k in next.attached.params) {

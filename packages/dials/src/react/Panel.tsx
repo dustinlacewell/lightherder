@@ -29,6 +29,7 @@ import {
   defaultSlotActions,
   usePanelComponents,
   useSlotActions,
+  type AttachControlProps,
   type PanelComponents,
   type SlotActions,
 } from './components'
@@ -158,12 +159,31 @@ export interface SlotRowProps {
   onChange: () => void
 }
 
+/* Set `folded` across a slot's whole modulation subtree — the shift-click
+   fold-all cascade. Plain recursion over the live tree; no component
+   plumbing needed because fold state lives on the slots themselves. */
+function foldSubtree(slot: Slot<unknown>, next: boolean): void {
+  slot.folded = next
+  const src = slot.attached
+  if (!src) return
+  for (const k in src.params) {
+    foldSubtree(src.params[k] as Slot<unknown>, next)
+  }
+}
+
 /**
  * One slot's row: caption, editor, attach control, and — when a source
  * is attached — a nested sub-panel of the source's own params (itself a
  * stack of `SlotRow`s, recursively). Exported so a consumer can compose
  * its own container arrangement (e.g. a horizontal strip) without
  * reimplementing the recursion, editor selection, or attach logic.
+ *
+ * The row's fold state (`slot.folded`) is owned HERE, not by the Row
+ * component: the toggle writes the slot and notifies through `onChange`,
+ * so folds survive remounts and the host can observe how much of the
+ * modulation tree is actually visible (herder sizes the dial node from
+ * it). Deliberately NOT a SlotAction — fold is view state, not model
+ * state: no op, no wire, no persistence.
  */
 export function SlotRow({
   label,
@@ -174,6 +194,7 @@ export function SlotRow({
   onChange,
 }: SlotRowProps): ReactNode {
   const c = usePanelComponents()
+  const actions = useSlotActions()
   const attached = slot.attached
   // A slot can opt out of modulation entirely (meta.modulatable: false):
   // no attach glyph, no picker, no candidates. It still renders its
@@ -192,25 +213,39 @@ export function SlotRow({
     />
   ) : undefined
 
-  // The attached source's description is the AttachControl's job to
-  // surface (its trigger/cells carry it) — no separate help affordance.
-  const attachNode =
-    candidates.length > 0 || attached ? (
-      <c.AttachControl
-        path={rowPath}
-        slot={slot}
-        candidates={candidates}
-        onChange={onChange}
-      />
-    ) : undefined
+  // The attach picker's pure-view props: current selection, mode,
+  // candidates, and callbacks pre-bound to the actions HERE — the
+  // control itself never touches the slot, so a host's mediation can't
+  // be bypassed. The attached source's description is the
+  // AttachControl's job to surface (its trigger/cells carry it).
+  const attachProps: AttachControlProps | undefined =
+    candidates.length > 0 || attached
+      ? {
+          path: rowPath,
+          current: attached?.def.name ?? null,
+          mode: slot.modMode,
+          candidates,
+          onPick: (name) => {
+            actions.attach(rowPath, slot, name)
+            onChange()
+          },
+          onMode: (m) => {
+            actions.setMode(rowPath, slot, m)
+            onChange()
+          },
+        }
+      : undefined
 
   // When the bundle's Slider hosts the attach control itself (e.g. the
   // knob places the modulation glyph in its face), route the attach
-  // node into the numeric editor and drop the standalone row cell so it
-  // renders exactly once. Non-numeric slots always use the row cell.
+  // props into the numeric editor — it renders the configured
+  // AttachControl with `hosted` open-state — and drop the standalone
+  // row cell so the picker renders exactly once. Non-numeric slots
+  // always use the row cell.
   const hostsAttach = Boolean(c.sliderHostsAttach) && slot.outType === 'number'
-  const hostedAttach = hostsAttach ? attachNode : undefined
-  const rowAttach = hostsAttach ? undefined : attachNode
+  const hostedAttach = hostsAttach ? attachProps : undefined
+  const rowAttach =
+    !hostsAttach && attachProps ? <c.AttachControl {...attachProps} /> : undefined
 
   // Numeric slots keep their editor while a source is attached — the
   // slider/knob shows the live modulated output (via the lastSample
@@ -265,6 +300,12 @@ export function SlotRow({
     </div>
   ) : null
 
+  const onFold = (next: boolean, all: boolean): void => {
+    if (all) foldSubtree(slot, next)
+    else slot.folded = next
+    onChange()
+  }
+
   return (
     <div
       className="dials-slot"
@@ -279,6 +320,8 @@ export function SlotRow({
         attach={rowAttach}
         nested={nested ?? undefined}
         description={slot.dial.meta.description}
+        folded={Boolean(attached && slot.folded)}
+        onFold={onFold}
       />
     </div>
   )
@@ -297,7 +340,7 @@ function SlotEditorView({
   editors?: Record<string, SlotEditor>
   liveOverride?: LiveOverride
   onChange: () => void
-  attach?: ReactNode
+  attach?: AttachControlProps
 }): ReactNode {
   const actions = useSlotActions()
   if (slot.outType === 'number') {
@@ -340,7 +383,7 @@ function NumberEditor({
   slot: Slot<number>
   liveOverride?: LiveOverride
   onChange: () => void
-  attach?: ReactNode
+  attach?: AttachControlProps
 }): ReactNode {
   const c = usePanelComponents()
   const actions = useSlotActions()
@@ -358,11 +401,8 @@ function NumberEditor({
     actions.setValue(path, slot, v)
     onChange()
   }
-  // A slot opts into the smoothing control by declaring a `lerp` value
-  // at construction (even `0`), mirroring how `description` gates the
-  // help icon by presence. Slots that never mention lerp stay clean.
-  const setLerp = (seconds: number) => {
-    actions.setLerp(path, slot, seconds)
+  const setGlide = (seconds: number) => {
+    actions.setGlide(path, slot, seconds)
     onChange()
   }
   // Narrow accessors for modulation-aware sliders: whether a source is
@@ -404,9 +444,19 @@ function NumberEditor({
         live={live}
         depth={slot.modDepth}
         mode={slot.modMode}
-        onDepthChange={onDepthChange}
+        // Like the attach picker, the depth gesture is a modulation
+        // affordance — a non-modulatable slot gets neither, so its
+        // knob is fully inert to right-drag.
+        onDepthChange={meta.modulatable !== false ? onDepthChange : undefined}
+        glide={slot.glide}
+        // The glide affordance is opt-in per slot (meta.glidable) — the
+        // sampler honors slot.glide regardless, but only an opted-in
+        // slot grows the gesture/editor.
+        onGlide={meta.glidable ? setGlide : undefined}
+        unit={meta.unit}
+        format={meta.format}
         defaultValue={slot.dial.initial}
-        attach={attach}
+        attachProps={attach}
         label={slot.dial.meta.label ?? path[path.length - 1]}
       />
       {c.sliderShowsValue ? null : (
@@ -419,9 +469,6 @@ function NumberEditor({
           onChange={set}
         />
       )}
-      {meta.lerp !== undefined ? (
-        <c.LerpControl value={meta.lerp} onChange={setLerp} />
-      ) : null}
     </div>
   )
 }

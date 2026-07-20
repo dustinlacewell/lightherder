@@ -1,7 +1,8 @@
 /* Ephemera — the performance transients a session relays but the
    document never keeps: sparks, taps, switch holds, draw strokes, the
-   freeze switch, the step tick, screen clears, preview pins, and the
-   media blobs that ride alongside a markMedia op.
+   freeze switch, the step tick, screen clears, preview pins, the
+   media blobs that ride alongside a markMedia op, and the remote
+   video URLs a media device can point at instead.
 
    Same shape as dispatch: emit fans out to whoever is watching (the
    session, when one exists), watch is the seam, and `muted` wraps remote
@@ -23,7 +24,8 @@ export type Eph =
   | { t: 'frozen'; on: boolean }
   | { t: 'tick' }
   | { t: 'clearAll' }
-  | { t: 'media'; key: string; blob: Blob };
+  | { t: 'media'; key: string; blob: Blob }
+  | { t: 'mediaurl'; key: string; url: string };
 
 const watchers = new Set<(e: Eph) => void>();
 let mute = 0;

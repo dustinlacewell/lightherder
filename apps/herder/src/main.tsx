@@ -8,7 +8,7 @@ import '@xyflow/react/dist/style.css';
 import '@ldlework/phosphor/styles.css';
 import '@ldlework/phosphor-dials/styles.css';
 import './style.css';
-import { bootGL } from './gl/context';
+import { bootGL } from './engine/context';
 import { Engine } from './engine';
 import { engineRef } from './runtime';
 import { App } from './ui/App';

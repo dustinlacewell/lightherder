@@ -3,28 +3,28 @@
    image or video, and remembers it across reloads (see mediaStore.ts).
    Its *camera* is a loop in the engine, not here. */
 
-import type { GLC } from '../../gl/context';
-import { loadStoredMedia, storeMedia } from '../../persist';
+import type { GLC } from '../context';
+import { dropStoredMedia, loadStoredMedia, loadStoredMediaUrl, storeMedia, storeMediaUrl } from '../../persist';
+import { FrameTex } from './frameTex';
 
 export class MediaSource {
   readonly tex: WebGLTexture;
+  private frame: FrameTex;
   private video: HTMLVideoElement | null = null;
 
-  constructor(private g: GLC, private nodeId: string) {
-    const gl = g.gl;
-    this.tex = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    this.upload(paintStainedGlass());
+  constructor(g: GLC, private nodeId: string) {
+    this.frame = new FrameTex(g.gl);
+    this.tex = this.frame.tex;
+    this.frame.upload(paintStainedGlass());
     loadStoredMedia(nodeId).then(f => { if (f) this.load(f, false); });
+    /* a stored blob wins if both exist (shouldn't — load/loadUrl each
+       clear the other's record) */
+    loadStoredMediaUrl(nodeId).then(url => { if (url) this.loadUrl(url, false); });
   }
 
   /** re-upload each frame while a video is playing */
   update(): void {
-    if (this.video && this.video.readyState >= 2 && !this.video.paused) this.upload(this.video);
+    if (this.video && this.video.readyState >= 2 && !this.video.paused) this.frame.upload(this.video);
   }
 
   async load(file: Blob, persist = true): Promise<void> {
@@ -44,18 +44,34 @@ export class MediaSource {
       const cx = cv.getContext('2d')!;
       const s = Math.max(cv.width / bmp.width, cv.height / bmp.height);
       cx.drawImage(bmp, (cv.width - bmp.width * s) / 2, (cv.height - bmp.height * s) / 2, bmp.width * s, bmp.height * s);
-      this.upload(cv);
+      this.frame.upload(cv);
     }
-    if (persist) storeMedia(this.nodeId, file).catch(() => { /* storage full / denied — keep running, just don't remember it */ });
+    if (persist) {
+      storeMedia(this.nodeId, file).catch(() => { /* storage full / denied — keep running, just don't remember it */ });
+      storeMediaUrl(this.nodeId, null);
+    }
   }
 
-  private upload(src: TexImageSource): void {
-    const gl = this.g.gl;
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  /** point this device at a remote video file — same upload-per-tick
+      shape as a dropped video, just sourced from a URL instead of an
+      object URL over a local Blob. `crossOrigin` is required for the
+      GPU to read the frame at all; a host without permissive CORS
+      headers fails the texImage2D upload (browser policy, not ours). */
+  async loadUrl(url: string, persist = true): Promise<void> {
+    const v = document.createElement('video');
+    v.crossOrigin = 'anonymous';
+    v.src = url;
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    await v.play();
+    this.video = v;
+    if (persist) {
+      storeMediaUrl(this.nodeId, url);
+      dropStoredMedia(this.nodeId).catch(() => { /* best-effort */ });
+    }
   }
+
 }
 
 /* a friend's pane of stained glass, remembered in voronoi */

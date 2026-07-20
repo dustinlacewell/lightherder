@@ -17,25 +17,24 @@
  * Knob itself from the forwarded `depth`/`mode` props. Right-drag on
  * the knob edits the depth via `onDepthChange`.
  *
+ * When the bundle hosts the attach picker in the dial
+ * (`sliderHostsAttach`), the Panel hands this slider the picker's
+ * PROPS (`attachProps`), not a pre-rendered node — the slider renders
+ * the configured `AttachControl` itself (via `usePanelComponents`),
+ * passing `hosted` open-state so a right-click on the dial face opens
+ * the popover. No element surgery, and a custom bundle's AttachControl
+ * is honored automatically.
+ *
  * `scale: 'log'` passes straight through — the Knob maps drags through
- * log space internally, like phosphor's Slider. `step` is now the slot's
+ * log space internally, like phosphor's Slider. `step` is the slot's
  * DECLARED notch only (the Panel passes `meta.step`, undefined for a
- * continuous slot), so it forwards straight to the Knob: a discrete dial
- * snaps to its notch, a continuous one stays smooth. No synthesized
- * filler to guard against anymore.
+ * continuous slot), so it forwards straight to the Knob. `unit` and
+ * `format` (from the slot's meta) feed the Knob's own readout.
  */
 
-import {
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Knob } from '@ldlework/phosphor'
-import type { SliderProps } from '@ldlework/dials/react'
+import { usePanelComponents, type SliderProps } from '@ldlework/dials/react'
 
 /**
  * Knob face diameter in px. Set per bundle via `makeDialPanelComponents`
@@ -54,24 +53,36 @@ export interface KnobSliderExtras {
    * strip. Off by default — captioning stays the Row's job.
    */
   showLabel?: boolean
+  /**
+   * The glide (`slot.glide`) in seconds that reads as a FULL glide bar.
+   * The slot's glide is normalized against this to fill the Knob's bar,
+   * so the primitive stays unitless while the bundle owns the time
+   * scale. Default 2s.
+   */
+  glideMax?: number
 }
+
+const DEFAULT_GLIDE_MAX = 2
 
 /**
  * A `KnobSlider` variant bound to a fixed knob size (and optional
  * self-caption), for the panel bundle's `Slider` slot (which the Panel
  * calls with plain `SliderProps` only). Returns the shared `KnobSlider`
- * reference when neither is set so the common bundle stays referentially
+ * reference when nothing is set so the common bundle stays referentially
  * stable.
  */
 export function sizedKnobSlider(
   knobSize?: number,
   showLabel?: boolean,
+  glideMax?: number,
 ): (props: SliderProps) => ReactNode {
-  if (knobSize === undefined && !showLabel) return KnobSlider
+  if (knobSize === undefined && !showLabel && glideMax === undefined)
+    return KnobSlider
   return (props: SliderProps) => (
     <KnobSlider
       {...props}
       {...(knobSize !== undefined ? { knobSize } : {})}
+      {...(glideMax !== undefined ? { glideMax } : {})}
       showLabel={!!showLabel}
     />
   )
@@ -89,26 +100,31 @@ export function KnobSlider({
   depth,
   onDepthChange,
   mode,
+  glide,
+  onGlide,
+  unit,
+  format,
   defaultValue,
-  attach,
+  attachProps,
   label,
   knobSize = DEFAULT_KNOB_SIZE,
   showLabel = false,
+  glideMax = DEFAULT_GLIDE_MAX,
 }: SliderProps & KnobSliderExtras): ReactNode {
   const [liveSample, setLiveSample] = useState<number | undefined>(undefined)
   // When the Panel routes the attach control here (sliderHostsAttach),
   // we own the picker's open state so a right-click on the dial can open
-  // it. Cloned onto the pre-rendered AttachControl element as controlled
-  // open props; the glyph rides in the knob's face via `tab`.
+  // it. The configured AttachControl renders in-dial (it keys its
+  // presentation off `hosted`); the glyph rides in the knob's face via
+  // `tab`.
   const [pickerOpen, setPickerOpen] = useState(false)
-  const hostedAttach =
-    attach && isValidElement(attach)
-      ? cloneElement(attach as ReactElement<any>, {
-          inDial: true,
-          open: pickerOpen,
-          onOpenChange: setPickerOpen,
-        })
-      : null
+  const { AttachControl } = usePanelComponents()
+  const hostedAttach = attachProps ? (
+    <AttachControl
+      {...attachProps}
+      hosted={{ open: pickerOpen, onOpenChange: setPickerOpen }}
+    />
+  ) : null
 
   // Live poll — only while a source is attached. React bails out of
   // re-rendering when the polled value is unchanged, so an unsampled
@@ -139,6 +155,19 @@ export function KnobSlider({
   }, [attached])
 
   const riding = attached && liveSample !== undefined
+  // Glide bar + gesture: the bar is a pure readout of the slot's glide
+  // seconds normalized against the bundle's full-bar reference (0 draws
+  // nothing). The gesture wires only when the Panel passed `onGlide` —
+  // i.e. the slot opted in via `meta.glidable` — so a non-gliding knob
+  // keeps shift+right free for the host's port chord. The gesture
+  // reports normalized amt; map it back to seconds for the action.
+  const glideNorm =
+    typeof glide === 'number' && glideMax > 0
+      ? Math.min(glide / glideMax, 1)
+      : undefined
+  const onChangeGlide = onGlide
+    ? (amt: number) => onGlide(amt * glideMax)
+    : undefined
   return (
     <Knob
       value={riding ? liveSample : value}
@@ -146,11 +175,15 @@ export function KnobSlider({
       range={[min, max]}
       depth={depth}
       mode={mode ?? 'center'}
+      glide={glideNorm}
+      onChangeGlide={onChangeGlide}
       onChangeDepth={onDepthChange}
       onRightClick={hostedAttach ? () => setPickerOpen(true) : undefined}
       scale={scale ?? 'linear'}
       size={knobSize}
       {...(step !== undefined ? { step } : {})}
+      {...(unit !== undefined ? { unit } : {})}
+      {...(format !== undefined ? { format } : {})}
       {...(showLabel && typeof label === 'string' ? { label } : {})}
       onChangeBaseline={onChange}
       defaultValue={defaultValue}

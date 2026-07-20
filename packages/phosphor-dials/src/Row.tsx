@@ -17,33 +17,9 @@
  * recursion is visually unambiguous.
  */
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { type ReactNode } from 'react'
 import { HoverCard } from '@ldlework/phosphor'
 import type { RowProps } from '@ldlework/dials/react'
-
-/*
- * Subtree fold-all signal. A shift-click on a row's fold toggle applies
- * that row's new state to everything below it — collapse-all or
- * expand-all, whichever direction the shift-click just set. Since nested
- * rows are opaque children, the ancestor can't reach them directly:
- * each row broadcasts a `{ target, nonce }` to its descendants and bumps
- * the nonce on shift-click; every descendant snaps to `target` whenever
- * the nonce changes. Each row re-provides its own signal, so the cascade
- * is scoped to the clicked row's subtree, not the whole panel. `nonce
- * === 0` is the mount baseline (no cascade requested yet).
- */
-interface FoldSignal {
-  target: boolean // desired `collapsed` for the subtree
-  nonce: number // bumped per shift-click to force re-application
-}
-const FoldAllContext = createContext<FoldSignal>({ target: false, nonce: 0 })
 
 /**
  * Where the slot's caption sits. `'above'` (default) is the classic
@@ -67,44 +43,21 @@ export function Row({
   attach,
   nested,
   description,
+  folded,
+  onFold,
   caption = 'above',
 }: RowProps & { caption?: Caption }): ReactNode {
   const below = caption === 'below'
   // A nested drawer (an attached source's sub-params) can be folded
-  // away to keep deep modulation trees scannable. State is per-row and
-  // ephemeral — presentation only, never touches the dials tree. Rows
-  // with no drawer never show the toggle.
-  const [collapsed, setCollapsed] = useState(false)
+  // away to keep deep modulation trees scannable. CONTROLLED: the state
+  // lives on the slot (dials' SlotRow owns it and passes it down), so a
+  // shift-click cascade is a plain slot-subtree walk upstream and the
+  // host can observe how much of the tree is visible. Rows with no
+  // drawer never show the toggle.
+  const collapsed = folded ?? false
 
-  // When an ancestor issues a fold-all, its nonce changes; snap to the
-  // broadcast target. Only a change *after* this instance mounted counts
-  // — the nonce seen at mount is the baseline, so remounting never
-  // re-fires a stale request.
-  const parentSignal = useContext(FoldAllContext)
-  const seenNonce = useRef(parentSignal.nonce)
-  useEffect(() => {
-    if (parentSignal.nonce !== seenNonce.current) {
-      seenNonce.current = parentSignal.nonce
-      setCollapsed(parentSignal.target)
-    }
-  }, [parentSignal])
-
-  // Our own signal for descendants — its nonce bumps on shift-click to
-  // cascade the fold/unfold through the subtree.
-  const [subSignal, setSubSignal] = useState<FoldSignal>({
-    target: false,
-    nonce: 0,
-  })
-
-  const onFold = (e: React.MouseEvent) => {
-    if (e.shiftKey) {
-      // Toggle this row and cascade the same target to everything below.
-      const next = !collapsed
-      setCollapsed(next)
-      setSubSignal((s) => ({ target: next, nonce: s.nonce + 1 }))
-      return
-    }
-    setCollapsed((c) => !c)
+  const onFoldClick = (e: React.MouseEvent) => {
+    onFold?.(!collapsed, e.shiftKey)
   }
 
   // The fold toggle for a modulated row. In the above layout it hangs
@@ -117,7 +70,7 @@ export function Row({
       aria-expanded={!collapsed}
       aria-label={collapsed ? 'Expand modulation' : 'Collapse modulation'}
       title="Click to fold · Shift-click to fold all below"
-      onClick={onFold}
+      onClick={onFoldClick}
     >
       {collapsed ? '▸' : '▾'}
     </button>
@@ -163,13 +116,11 @@ export function Row({
         <div className="pd-row-attach pd-row-attach-bare">{attach}</div>
       ) : null}
       {nested ? (
-        <FoldAllContext.Provider value={subSignal}>
-          {/* Kept mounted while collapsed (just hidden) so each nested
-              row's own fold state survives folding an ancestor. */}
-          <div className="pd-row-nested" hidden={collapsed}>
-            {nested}
-          </div>
-        </FoldAllContext.Provider>
+        /* Kept mounted while collapsed (just hidden) so nested rows keep
+           their editor state; their fold state lives on the slots anyway. */
+        <div className="pd-row-nested" hidden={collapsed}>
+          {nested}
+        </div>
       ) : null}
     </div>
   )

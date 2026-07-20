@@ -3,6 +3,7 @@
 
 import { useCallback, useState } from 'react';
 import * as midi from '../../midi';
+import { KeybindReference } from './KeybindReference';
 
 interface UtilBarProps {
   onClear: () => void;
@@ -26,6 +27,8 @@ const ICONS = {
   midi: <svg {...UICON}><circle cx="7" cy="7" r="5.3" /><circle cx="7" cy="4.4" r="0.75" fill="currentColor" stroke="none" /><circle cx="4.6" cy="8.6" r="0.75" fill="currentColor" stroke="none" /><circle cx="9.4" cy="8.6" r="0.75" fill="currentColor" stroke="none" /></svg>,
   /* two figures sharing a link — a live room */
   session: <svg {...UICON}><circle cx="4.4" cy="5" r="1.8" /><circle cx="9.6" cy="5" r="1.8" /><path d="M1.8 12 A2.6 2.6 0 0 1 7 12 M7 12 A2.6 2.6 0 0 1 12.2 12" /></svg>,
+  /* a question mark — the keybind & gesture reference */
+  help: <svg {...UICON}><circle cx="7" cy="7" r="5.3" /><path d="M5.3 5.4 A1.7 1.7 0 1 1 7 8 V8.9" /><circle cx="7" cy="11" r="0.55" fill="currentColor" stroke="none" /></svg>,
 };
 
 /* a button whose icon flashes ✓/✗ with its async outcome */
@@ -72,6 +75,7 @@ function MidiButton({ logOpen, setLogOpen }: { logOpen: boolean; setLogOpen: (v:
 }
 
 export function UtilBar({ onClear, onNew, onCopy, onPaste, midiLogOpen, setMidiLogOpen, sessionOpen, setSessionOpen }: UtilBarProps) {
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <div className="utilbar">
       <button className="ubtn" title="Blank every screen (C)" onClick={onClear}>{ICONS.clear}</button>
@@ -84,6 +88,12 @@ export function UtilBar({ onClear, onNew, onCopy, onPaste, midiLogOpen, setMidiL
         title={`${sessionOpen ? 'Hide' : 'Show'} the session panel — host or join a live room`}
         onClick={() => setSessionOpen(!sessionOpen)}
       >{ICONS.session}</button>
+      <button
+        className={`ubtn${helpOpen ? ' lit' : ''}`}
+        title="Keyboard & gesture reference — every command and knob gesture"
+        onClick={() => setHelpOpen(true)}
+      >{ICONS.help}</button>
+      <KeybindReference open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

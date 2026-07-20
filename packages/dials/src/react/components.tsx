@@ -14,10 +14,10 @@
  * live on the Panel's `editors` prop — orthogonal concern.
  */
 
-import type { ComponentType, ReactNode } from 'react'
+import { createContext, useContext, type ComponentType, type ReactNode } from 'react'
 import type { ModMode, Slot } from '../core'
 import { attachFrom, detach, setDepth, setMode } from '../attach'
-import { setDial } from '../dial'
+import { setDial, setGlide } from '../dial'
 import { sourcesForType } from '../source'
 
 // ─── Prop shapes ──────────────────────────────────────────────────────
@@ -85,19 +85,40 @@ export interface SliderProps {
    */
   mode?: ModMode
   /**
+   * The slot's glide time constant (`slot.glide`, in seconds) — the
+   * slew applied to the combined output. Passed raw so a slider that
+   * shows a glide readout (e.g. a bar under the knob) can render it;
+   * the slider owns the mapping from seconds to its own display scale.
+   */
+  glide?: number
+  /**
+   * Set the glide (`slot.glide`) in seconds — the write side of
+   * `glide`. A slider with a glide gesture (e.g. shift+right-drag on a
+   * knob) calls this; the seconds↔display mapping is the slider's own.
+   * The Panel routes it to `actions.setGlide`, and passes it only when
+   * the slot opts in (`meta.glidable`) — absent means no gesture, no
+   * editor.
+   */
+  onGlide?: (seconds: number) => void
+  /** Unit suffix for the slider's own readout (`meta.unit`). */
+  unit?: string
+  /** Readout formatter (`meta.format`) — overrides the slider's built-in. */
+  format?: (v: number) => string
+  /**
    * The dial's construction-time value (`dial.initial`) — the reset
    * target for editors with a reset gesture (double-click, Home).
    */
   defaultValue?: number
   /**
-   * The slot's attach control, pre-rendered by the Panel. A slider
-   * implementation may host it *inside* itself (e.g. a knob placing the
-   * modulation glyph in its face) instead of leaving the Panel to lay
-   * it out in the row. When a slider consumes this, the Panel's Row
-   * should suppress its own copy to avoid rendering it twice. Optional
-   * and ignored by sliders that don't relocate it (like DefaultSlider).
+   * Props for the slot's attach control, present when the bundle
+   * declares `sliderHostsAttach` — the slider renders the configured
+   * `AttachControl` itself (e.g. a knob placing the modulation glyph in
+   * its face, via `usePanelComponents()`), supplying `hosted` so it
+   * owns the popover's open state. The Panel's Row suppresses its own
+   * copy, so the picker renders exactly once. Ignored by sliders that
+   * don't host it (like DefaultSlider).
    */
-  attach?: ReactNode
+  attachProps?: AttachControlProps
   /**
    * The slot's display label (`meta.label ?? key`), passed so a slider
    * that draws its own caption (e.g. a knob with the name engraved under
@@ -117,12 +138,6 @@ export interface NumberFieldProps {
   step?: number
   scale?: 'linear' | 'log'
   onChange: (v: number) => void
-}
-
-export interface LerpControlProps {
-  /** Current smoothing time constant in seconds (0 = off). */
-  value: number
-  onChange: (seconds: number) => void
 }
 
 export interface DropdownOption {
@@ -157,18 +172,56 @@ export interface RowProps {
    * prefer the default treatment; a Row uses one or the other.
    */
   description?: string
+  /**
+   * Whether the nested sub-panel is folded away. CONTROLLED: the state
+   * lives on the slot (`slot.folded`, owned by `SlotRow`), not in the Row
+   * — so folds survive remounts and are observable by the host (e.g. for
+   * sizing a node to its visible modulation tree). Only meaningful when
+   * `nested` is present.
+   */
+  folded?: boolean
+  /**
+   * Fold toggle callback. `next` is the desired folded state; `all`
+   * (a shift-click) applies it to the entire subtree below this row.
+   * Rows without a fold affordance ignore it.
+   */
+  onFold?: (next: boolean, all: boolean) => void
 }
 
 export interface HeadingProps {
   title: string
 }
 
+/**
+ * The attach picker's contract — deliberately a PURE VIEW: current
+ * selection, mode, candidates in; pre-bound callbacks out. No live
+ * `Slot` crosses this seam, so an AttachControl implementation *cannot*
+ * mutate the tree directly — every write goes through the callbacks,
+ * which the Panel's SlotRow binds to `SlotActions`. That makes a host's
+ * mediation (an op pipeline, a collab gate) enforceable by
+ * construction, not convention.
+ */
 export interface AttachControlProps {
   /** Stable path to the attach target's slot (see SliderProps.path). */
   path?: string[]
-  slot: Slot<unknown>
+  /** Name of the attached source, or `null` when nothing is attached. */
+  current: string | null
+  /** The slot's modulation mode (slot-level; present regardless of attachment). */
+  mode: ModMode
+  /** Registered sources matching the slot's type — the picker's options. */
   candidates: ReturnType<typeof sourcesForType>
-  onChange: () => void
+  /** Pick a source by name; `null` detaches. Pre-bound to the actions. */
+  onPick: (name: string | null) => void
+  /** Set the modulation mode. Pre-bound to the actions. */
+  onMode: (mode: ModMode) => void
+  /**
+   * Present when the bundle's Slider hosts this control inside itself
+   * (`sliderHostsAttach`): the slider owns the popover's open state so
+   * its own gestures (e.g. right-click on the knob face) can open it.
+   * Implementations render their in-place presentation when this is
+   * set, and their standalone trigger when it isn't.
+   */
+  hosted?: { open: boolean; onOpenChange: (open: boolean) => void }
 }
 
 // ─── Mediated mutation (SlotActions) ──────────────────────────────────
@@ -191,8 +244,12 @@ export interface SlotActions {
   setDepth(path: string[], slot: Slot<unknown>, depth: number): void
   /** Set the modulation mode. */
   setMode(path: string[], slot: Slot<unknown>, mode: ModMode): void
-  /** Set the smoothing time constant `meta.lerp`, in seconds. */
-  setLerp(path: string[], slot: Slot<unknown>, seconds: number): void
+  /**
+   * Set the glide time constant `slot.glide`, in seconds. Driven by
+   * the slider's glide gesture (shift+right-drag on the knob) or the
+   * default bundle's glide field.
+   */
+  setGlide(path: string[], slot: Slot<unknown>, seconds: number): void
 }
 
 /**
@@ -216,9 +273,7 @@ export const defaultSlotActions: SlotActions = {
   },
   setDepth: (_path, slot, depth) => setDepth(slot, depth),
   setMode: (_path, slot, mode) => setMode(slot, mode),
-  setLerp: (_path, slot, seconds) => {
-    slot.dial.meta.lerp = seconds
-  },
+  setGlide: (_path, slot, seconds) => setGlide(slot, seconds),
 }
 
 /**
@@ -228,6 +283,12 @@ export const defaultSlotActions: SlotActions = {
  * editor the bundle draws, WITHOUT forking the editor and without dials
  * knowing anything about those app concerns. `children` is the row's
  * control; return it wrapped.
+ *
+ * Contract policy on raw slots: chrome (here) and custom `SlotEditor`s
+ * receive the live `Slot` — both are HOST-authored code, and the host
+ * owns its model. Adapter-facing contracts (`SliderProps`,
+ * `AttachControlProps`) deliberately do not: adapters get narrow data +
+ * callbacks so they can't bypass the host's `SlotActions` mediation.
  */
 export interface SlotChromeProps {
   path: string[]
@@ -240,7 +301,6 @@ export interface SlotChromeProps {
 export interface PanelComponents {
   Slider: ComponentType<SliderProps>
   NumberField: ComponentType<NumberFieldProps>
-  LerpControl: ComponentType<LerpControlProps>
   Dropdown: ComponentType<DropdownProps>
   HelpTooltip: ComponentType<HelpTooltipProps>
   Row: ComponentType<RowProps>
@@ -286,15 +346,17 @@ export interface PanelComponents {
 
 export function DefaultSlider({
   value, min, max, step, scale, onChange,
+  attached, depth, onDepthChange, glide, onGlide,
 }: SliderProps): ReactNode {
   // Log-scaled slider: requires min > 0. Slider position lives in
   // [0, 1]; we map to/from the host range via exp/log.
   const useLog = scale === 'log' && min > 0 && max > min
+  let range: ReactNode
   if (useLog) {
     const logMin = Math.log(min)
     const logMax = Math.log(max)
     const pos = (Math.log(Math.max(value, min)) - logMin) / (logMax - logMin)
-    return (
+    range = (
       <input
         type="range"
         min={0}
@@ -307,18 +369,59 @@ export function DefaultSlider({
         }}
       />
     )
+  } else {
+    range = (
+      <input
+        type="range"
+        min={min}
+        max={max}
+        // A discrete slot snaps to its declared step; a continuous one gets
+        // a fine linear notch (a bare range input would default step to 1).
+        step={step ?? (max - min) / 1000}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    )
   }
+  // The default bundle exposes EVERY model property, however plainly:
+  // the modulation depth while a source is attached (the envelope it
+  // scales), and the glide when the slot opts in (onGlide present ⇔
+  // meta.glidable). Adapters replace these with gestures (right-drag,
+  // shift+right-drag on a knob); the zero-config panel stays complete.
+  const depthField =
+    attached && onDepthChange ? (
+      <label className="dials-depth" data-dials-depth="">
+        depth
+        <input
+          type="number"
+          min={0}
+          max={1}
+          step={0.01}
+          value={depth ?? 0}
+          onChange={(e) => onDepthChange(Number(e.target.value))}
+        />
+      </label>
+    ) : null
+  const glideField = onGlide ? (
+    <label className="dials-glide" data-dials-glide="">
+      glide
+      <input
+        type="number"
+        min={0}
+        step={0.1}
+        value={glide ?? 0}
+        onChange={(e) => onGlide(Number(e.target.value))}
+      />
+      s
+    </label>
+  ) : null
+  if (!depthField && !glideField) return range
   return (
-    <input
-      type="range"
-      min={min}
-      max={max}
-      // A discrete slot snaps to its declared step; a continuous one gets
-      // a fine linear notch (a bare range input would default step to 1).
-      step={step ?? (max - min) / 1000}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-    />
+    <>
+      {range}
+      {depthField}
+      {glideField}
+    </>
   )
 }
 
@@ -338,29 +441,6 @@ export function DefaultNumberField({
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
     />
-  )
-}
-
-/**
- * Default lerp control — a small seconds field for the slot's
- * smoothing time constant (`meta.lerp`). `0` means no smoothing (the
- * dial snaps). Rendered only for slots that opt in by declaring a
- * `lerp` value at construction (see `NumberEditor`).
- */
-export function DefaultLerpControl({
-  value, onChange,
-}: LerpControlProps): ReactNode {
-  return (
-    <label className="dials-lerp" data-dials-lerp="">
-      <span className="dials-lerp-label">lerp (s)</span>
-      <input
-        type="number"
-        min={0}
-        step={0.01}
-        value={value}
-        onChange={(e) => onChange(Math.max(0, Number(e.target.value)))}
-      />
-    </label>
   )
 }
 
@@ -454,39 +534,26 @@ const MODE_NEXT: Record<ModMode, ModMode> = {
 }
 
 export function DefaultAttachControl({
-  path = [], slot, candidates, onChange,
+  current, mode, candidates, onPick, onMode,
 }: AttachControlProps): ReactNode {
-  // Consume context lazily to avoid an import cycle at module top.
   const { Dropdown } = usePanelComponents()
-  const actions = useSlotActions()
-  if (candidates.length === 0 && !slot.attached) return null
-  const current = slot.attached?.def.name ?? ''
+  if (candidates.length === 0 && !current) return null
   const options: DropdownOption[] = [
     { value: '', label: 'none' },
     ...candidates.map((d) => ({ value: d.name, label: d.name })),
   ]
-  const mode = slot.modMode
   return (
     <>
       <Dropdown
-        value={current}
+        value={current ?? ''}
         options={options}
-        onChange={(name) => {
-          // Depth and mode live on the slot and survive a swap on their
-          // own. `attach` handles null (detach), same-name (no-op), and
-          // swap-to-fresh; the mediator (or the default) performs it.
-          actions.attach(path, slot, name || null)
-          onChange()
-        }}
+        onChange={(name) => onPick(name || null)}
       />
       <button
         type="button"
         className="dials-mode"
         data-dials-mode={mode}
-        onClick={() => {
-          actions.setMode(path, slot, MODE_NEXT[mode])
-          onChange()
-        }}
+        onClick={() => onMode(MODE_NEXT[mode])}
       >
         {MODE_GLYPH[mode]}
       </button>
@@ -497,7 +564,6 @@ export function DefaultAttachControl({
 export const defaultPanelComponents: PanelComponents = {
   Slider: DefaultSlider,
   NumberField: DefaultNumberField,
-  LerpControl: DefaultLerpControl,
   Dropdown: DefaultDropdown,
   HelpTooltip: DefaultHelpTooltip,
   Row: DefaultRow,
@@ -509,8 +575,6 @@ export const defaultPanelComponents: PanelComponents = {
 //
 // Lives here (not in Panel.tsx) so the default AttachControl can read
 // the active `Dropdown` without an import cycle through Panel.
-
-import { createContext, useContext } from 'react'
 
 const PanelComponentsContext = createContext<PanelComponents>(
   defaultPanelComponents,

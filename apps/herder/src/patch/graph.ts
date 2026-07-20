@@ -17,9 +17,12 @@
                the 50/50 beamsplitter glass, KEY lumakeys B over A (the
                Roland keyer — "keying does electronically what the glass
                does optically").
-     SWITCH  — routes one of four video inputs to its output. Latching
-               clicks; the momentary flavor springs back to its home
-               position on release. A cut is instant (no frame cost).
+     SWITCH  — routes one of four inputs to its output. Latching clicks;
+               the momentary flavor springs back to its home position on
+               release. A cut is instant (no frame cost). Video- or
+               control-flavored (its `flavor`, like an IN/OUT): a video
+               switch cuts between four pictures, a control switch selects
+               among four dial signals.
      DIAL    — a control-signal source (−1…+1). Wire it to a camera's
                rotation or zoom port to work that axis by hand.
                Shift-drag the knob to work its Lerp — the glide time
@@ -54,9 +57,10 @@
 
 import type { Dials } from '@ldlework/dials';
 import { slotsFor } from './params';
+import { FX } from '../fx';
 import type { InstVals } from './library';
 
-export type NodeKind = 'media' | 'draw' | 'camera' | 'monitor' | 'mixer' | 'switch' | 'dial' | 'xypad' | 'in' | 'out' | 'module';
+export type NodeKind = 'media' | 'webcam' | 'draw' | 'camera' | 'monitor' | 'mixer' | 'wobbulate' | 'kaleido' | 'polar' | 'colorize' | 'solarize' | 'contour' | 'delay' | 'timebase' | 'glow' | 'polarize' | 'convolve' | 'paint' | 'morph' | 'halftone' | 'dither' | 'mosaic' | 'droste' | 'conformal' | 'relight' | 'turbwarp' | 'noise' | 'moire' | 'julia' | 'switch' | 'dial' | 'xypad' | 'in' | 'out' | 'module';
 
 /** one level of the patch tree — a module's inside is one of these */
 export interface SubPatch { nodes: PatchNode[]; edges: PatchEdge[] }
@@ -72,7 +76,8 @@ export interface NodeData extends Record<string, unknown> {
   sel: number;          // switch: latched (home) input, 0-based
   momentary: boolean;   // switch flavor: spring-return
   open: boolean;        // knob drawer visible
-  flavor?: 'v' | 'c';   // in/out: the signal kind of the port it defines
+  flavor?: 'v' | 'c';   // in/out: the signal kind of the port it defines;
+                        //   switch: whether it routes video or control wires
   patch?: SubPatch;     // module: the embedded patch (transition only — a
                         //   ref replaces it; deleted in C5)
   ref?: string;         // module: the library entry this instance references
@@ -153,10 +158,13 @@ export function mediaPaths(patch: SubPatch): string[] {
 
 /* ---- construction ------------------------------------------------------ */
 
-const KIND_LABEL: Record<NodeKind, string> = {
-  media: 'MEDIA', draw: 'DRAW', camera: 'CAM', monitor: 'MON', mixer: 'MIX', switch: 'SW', dial: 'DIAL', xypad: 'XY',
-  in: 'IN', out: 'OUT', module: 'MOD',
-};
+/* a fresh device's default name is its toolbar name (see Toolbar.tsx);
+   the momentary switch overrides to "Moment" in makeNode */
+const KIND_LABEL = {
+  media: 'Media', webcam: 'Webcam', draw: 'Canvas', camera: 'Camera', monitor: 'Monitor', mixer: 'Mixer',
+  delay: 'Delay', switch: 'Switch', dial: 'Dial', xypad: 'XY', in: 'In', out: 'Out', module: 'Module',
+  ...Object.fromEntries(Object.entries(FX).map(([k, d]) => [k, d.label])),
+} as Record<NodeKind, string>;
 
 function nextId(nodes: PatchNode[]): string {
   let max = 0;
@@ -167,12 +175,20 @@ function nextId(nodes: PatchNode[]): string {
   return `n${max + 1}`;
 }
 
+/** mint a fresh id against `nodes` — the same `n\d+` scheme `makeNode`
+    uses internally, exported for callers that mint several ids in a
+    row (paste) and must fold each one back into `nodes` before minting
+    the next, so no two land on the same number. */
+export function mintNodeId(nodes: PatchNode[]): string {
+  return nextId(nodes);
+}
+
 export interface MakeOpts { momentary?: boolean; flavor?: 'v' | 'c' }
 
 export function makeNode(kind: NodeKind, x: number, y: number, existing: PatchNode[], opts: MakeOpts = {}): PatchNode {
   const momentary = opts.momentary ?? false;
   const count = existing.filter(n => n.type === kind && n.data.momentary === momentary).length;
-  const label = kind === 'switch' && momentary ? 'MOM' : KIND_LABEL[kind];
+  const label = kind === 'switch' && momentary ? 'Moment' : KIND_LABEL[kind];
   return {
     id: nextId(existing),
     type: kind,
@@ -183,7 +199,7 @@ export function makeNode(kind: NodeKind, x: number, y: number, existing: PatchNo
       sel: 0,
       momentary,
       open: false,
-      ...(kind === 'in' || kind === 'out' ? { flavor: opts.flavor ?? 'v' } : {}),
+      ...(kind === 'in' || kind === 'out' || kind === 'switch' ? { flavor: opts.flavor ?? 'v' } : {}),
       /* a module is nothing but a reference — the caller mints or names
          its entry and sets `ref`; no embedded patch is initialized */
       /* a camera boots with the rig's classic handle ports exposed;

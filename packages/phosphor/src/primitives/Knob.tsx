@@ -31,6 +31,23 @@ interface KnobProps {
    */
   mode?: 'center' | 'up' | 'down'
   /**
+   * Glide amount, normalized to [0, 1] — a static readout of the slot's
+   * glide (smoothing) setting. When > 0, a thin bar sits in the arc's
+   * bottom gap, filling left→right in proportion. The primitive is
+   * unitless: the host maps its own glide seconds (against whatever max
+   * it considers "full glide") into this 0..1. Absent/0 draws nothing.
+   */
+  glide?: number | undefined
+  /**
+   * SHIFT + right-button vertical drag edits the glide, reported here
+   * in the same normalized [0, 1] as `glide` (same 150px-for-full /
+   * Shift-already-held convention, so no extra fine mode). The gesture is
+   * active only when this handler is provided. A shift+right press that
+   * does NOT cross the drag threshold is left to bubble as a contextmenu
+   * so a host chord (e.g. a port toggle) still fires on shift+right-CLICK.
+   */
+  onChangeGlide?: ((amt: number) => void) | undefined
+  /**
    * Right-button vertical drag edits the modulation depth (same
    * 150px-for-full-travel / Shift = 0.15× fine convention as the value
    * drag), reported here clamped into [0, 1]. The gesture is active
@@ -147,6 +164,8 @@ export function Knob({
   range,
   depth,
   mode = 'center',
+  glide,
+  onChangeGlide,
   onChangeDepth,
   onRightClick,
   scale = 'linear',
@@ -178,6 +197,18 @@ export function Knob({
   const depthDrag = useRef<{ y: number; d: number; moved: boolean } | null>(
     null,
   )
+  // SHIFT + right-button glide (lerp) drag — its own state so it never
+  // interferes with value- or depth-drags. `moved` gates the same
+  // drag-vs-tap split depth uses: a shift+right press that never crosses
+  // the threshold is a click, left to bubble to the host's contextmenu.
+  const glideDrag = useRef<{ y: number; l: number; moved: boolean } | null>(
+    null,
+  )
+  // A committed lerp drag (shift+right, moved) must swallow the
+  // contextmenu that fires around pointer-up, or the host's shift+right
+  // chord (port toggle) would also fire. Set on release, read+cleared by
+  // onContextMenu. A tap leaves it false, so the chord still runs.
+  const glideDragCommitted = useRef(false)
 
   const useLog = scale === 'log' && min > 0 && max > min
 
@@ -222,11 +253,28 @@ export function Knob({
   const onDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button === 2) {
-        // A MODIFIED right-click (ctrl/shift/alt/meta) belongs to the
-        // host wrapping the knob — its own context-menu chords (MIDI
-        // learn, a port toggle, …). The knob's depth-drag / picker-tap is
-        // a PLAIN right-click only, so bail here and let the contextmenu
-        // event bubble to the host's onContextMenu. preventDefault (but
+        // SHIFT + right, with a glide handler wired, ARMS a lerp drag —
+        // but only a drag past the threshold commits. Capture the pointer
+        // to track movement. preventDefault kills the browser's focus ring
+        // (it does NOT suppress the later contextmenu — that fires on
+        // mouse-up independently), so a press that never moves still emits
+        // a contextmenu for the host's shift+right-CLICK chord (e.g. a
+        // port toggle). onMove decides drag vs tap; onUp tears down.
+        if (
+          e.shiftKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          !e.metaKey &&
+          onChangeGlide
+        ) {
+          e.preventDefault()
+          ;(e.target as Element).setPointerCapture(e.pointerId)
+          glideDrag.current = { y: e.clientY, l: glide ?? 0, moved: false }
+          return
+        }
+        // Any OTHER modified right-click (ctrl/alt/meta, or shift with no
+        // glide handler) belongs to the host — bail and let the
+        // contextmenu bubble to its onContextMenu. preventDefault (but
         // NOT capture) so the browser doesn't focus the knob and paint
         // its focus ring on what is really the host's gesture.
         if (e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) {
@@ -247,11 +295,20 @@ export function Knob({
       ;(e.target as Element).setPointerCapture(e.pointerId)
       drag.current = { y: e.clientY, v: toPos(baseline), moved: false }
     },
-    [baseline, toPos, depth, onChangeDepth, onRightClick],
+    [baseline, toPos, depth, glide, onChangeDepth, onChangeGlide, onRightClick],
   )
 
   const onMove = useCallback(
     (e: React.PointerEvent) => {
+      if (glideDrag.current) {
+        const dy = glideDrag.current.y - e.clientY
+        // Past a few px this is a drag — commit it; a shorter press stays
+        // a tap and bubbles as a contextmenu (host chord) untouched.
+        if (Math.abs(dy) > 3) glideDrag.current.moved = true
+        const next = clamp(glideDrag.current.l + dy / 150, 0, 1)
+        onChangeGlide?.(next)
+        return
+      }
       if (depthDrag.current) {
         const dy = depthDrag.current.y - e.clientY
         // Past a few px this is a drag, not a tap — suppresses the
@@ -272,7 +329,7 @@ export function Knob({
       const next = drag.current.v + (dy / 150) * fine
       setBaseline(fromPos(next))
     },
-    [setBaseline, fromPos, onChangeDepth],
+    [setBaseline, fromPos, onChangeDepth, onChangeGlide],
   )
 
   const onUp = useCallback(
@@ -280,8 +337,10 @@ export function Knob({
       // A right-release that never crossed the drag threshold is a tap
       // — open the associated control instead of leaving a depth edit.
       if (depthDrag.current && !depthDrag.current.moved) onRightClick?.()
+      if (glideDrag.current?.moved) glideDragCommitted.current = true
       drag.current = null
       depthDrag.current = null
+      glideDrag.current = null
       try {
         ;(e.target as Element).releasePointerCapture(e.pointerId)
       } catch {
@@ -369,6 +428,17 @@ export function Knob({
       : pb
   const showBand = depth !== undefined && depth > 0 && bandHi > bandLo
 
+  // Glide bar: a thin readout of the glide amount, sitting in the arc's
+  // bottom gap — NOT spanning the two track ends, but a shorter rail
+  // resting comfortably between them and a touch lower. The lit fill
+  // grows left→right by the normalized glide. Pure readout.
+  const glideAmt = typeof glide === 'number' ? clamp(glide, 0, 1) : 0
+  const barHalf = 6 // half-width of the rail, in viewBox units
+  const barX0 = C - barHalf
+  const barX1 = C + barHalf
+  const barY = C + 16.5 // below the arc endpoints, seated in the gap
+  const showGlide = glideAmt > 0
+
   return (
     <div
       ref={rootRef}
@@ -391,7 +461,15 @@ export function Knob({
         e.stopPropagation()
         if (defaultValue !== undefined) setBaseline(defaultValue)
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        // A committed lerp drag owns this gesture — stop it reaching the
+        // host's shift+right chord. A tap (flag false) lets it through.
+        if (glideDragCommitted.current) {
+          glideDragCommitted.current = false
+          e.stopPropagation()
+        }
+      }}
       onKeyDown={onKeyDown}
     >
       <div className="chrome-knob-dial" style={{ width: size, height: size }}>
@@ -433,6 +511,27 @@ export function Knob({
                 Math.max(aBase, aValue),
               )}
             />
+          )}
+          {/* glide bar — glide readout across the bottom gap: a dim rail
+              end-to-end with a lit fill growing left→right. Drawn under
+              the cap so the chrome sits over its inner ends. */}
+          {showGlide && (
+            <>
+              <line
+                className="chrome-knob-glide-rail"
+                x1={barX0}
+                y1={barY}
+                x2={barX1}
+                y2={barY}
+              />
+              <line
+                className="chrome-knob-glide-fill"
+                x1={barX0}
+                y1={barY}
+                x2={barX0 + (barX1 - barX0) * glideAmt}
+                y2={barY}
+              />
+            </>
           )}
           {/* 5. cap + pointer(s) */}
           <circle

@@ -52,6 +52,23 @@ export async function loadStoredMedia(nodeId: string): Promise<File | null> {
   }
 }
 
+/** drop the blob at exactly `nodeId` — the single-key twin of
+    dropStoredMediaUnder, used when a media device switches from a
+    dropped file to a remote URL (the two are mutually exclusive, so
+    the stale blob shouldn't linger and win the boot-time race). */
+export async function dropStoredMedia(nodeId: string): Promise<void> {
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(nodeId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch { /* nothing to clean up, or storage unavailable */ }
+}
+
 /** copy one stored blob to a new key — how a library snapshot or a
     module instance takes its own copy of a picture. A missing source
     is a quiet no-op (the media device is still on its stained glass). */

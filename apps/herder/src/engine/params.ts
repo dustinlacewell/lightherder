@@ -2,9 +2,9 @@
    whatever rides its control port (any param can carry one — the port
    is UI; the wire is what matters here).
 
-   The slot output is the dials-resolved value: the user's knob, glided
-   by `meta.lerp`, plus any attached-source modulation (base + depth·
-   signal) — already written to `slot.lastSample` by the engine's
+   The slot output is the dials-resolved value: the user's knob plus any
+   attached-source modulation (base + depth·signal), slewed by the
+   slot's `glide` — already written to `slot.lastSample` by the engine's
    per-tick sampling pass. That resolved value is the new "base"; a
    riding control-port WIRE then adds a second, engine-side layer on top.
    Bipolar params take ± half the knob's range around it; unipolar
@@ -46,7 +46,11 @@ export function paramValue(n: PatchNode, key: string, wiring: Wiring, dials: Sta
   const min = s.dial.meta.min ?? 0;
   const max = s.dial.meta.max ?? 1;
   const range = max - min;
-  const raw = v + c * (h?.polarity === 'uni' ? range : range / 2);
+  /* ratio params ride in log space: the signal multiplies, so a full
+     throw is min↔max from a centered knob instead of a lopsided add */
+  const raw = h?.scale === 'log'
+    ? v * Math.exp(c * Math.log(max / Math.max(min, 1e-6)) * (h?.polarity === 'uni' ? 1 : 0.5))
+    : v + c * (h?.polarity === 'uni' ? range : range / 2);
   const out = h?.periodic ? raw : clamp(raw, h?.cmin ?? min, h?.cmax ?? max);
   setLive(`${n.id}:${key}`, out);
   return out;
