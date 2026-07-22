@@ -24,8 +24,8 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { CrtSurface } from '@ldlework/crt/react'
 import {
-  CrtSurface,
   StampPass,
   type CrtPreset,
   type DrawablePass,

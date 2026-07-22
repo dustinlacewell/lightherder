@@ -703,6 +703,27 @@ html, body, #root {
 }
 .tool:hover { border-color: var(--line2); color: var(--amber); }
 
+/* the HoverCard wrapper span stands between the list and the button —
+   stretch it so the tools keep their one shared width */
+.tool-list .chrome-hovercard-host { display: flex; }
+.tool-list .chrome-hovercard-host > .tool { flex: 1 1 auto; min-width: 0; }
+
+/* the tool hover card: the effect preview canvas above the words */
+.tool-card-preview {
+  display: block;
+  width: 220px;
+  height: 124px;
+  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #000;
+}
+.tool-card-coda {
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.55;
+}
+
 /* ---- transport ------------------------------------------------------------------ */
 
 .topcenter {
@@ -907,6 +928,50 @@ html, body, #root {
 }
 .pv-grip:hover { background:
     repeating-linear-gradient(135deg, var(--maple) 0 1.5px, transparent 1.5px 5px); }
+
+/* ---- fullscreen preview (Tab) ------------------------------------------- */
+
+/* Tab swaps the whole bench for a single full-viewport monitor of the pinned
+   screen. Everything but the preview is hidden; the engine keeps painting the
+   pinned node into the preview's face, which now fills the viewport. */
+.bench.fullscreen > .react-flow,
+.bench.fullscreen > .crumbs,
+.bench.fullscreen > .toolbar,
+.bench.fullscreen > .topcenter,
+.bench.fullscreen > .globalsbar,
+.bench.fullscreen > .library,
+.bench.fullscreen > .midilog,
+.bench.fullscreen > .session-panel { display: none; }
+
+.preview.pv-full {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  /* stay BELOW the glass (#glass is z-index 6, like the corner preview at
+     z-index 5): the transparent face lets the engine's video show through.
+     A higher z-index would paint this black box OVER the glass — all black. */
+  z-index: 5;
+}
+/* header is chrome too — gone in fullscreen; Tab is the way back out */
+.pv-full .pv-head { display: none; }
+/* the largest 16:9 box that fits the viewport, centered by the flex above */
+.pv-full .pv-face {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+}
 
 /* ---- the MIDI log ------------------------------------------------------- */
 

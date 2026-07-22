@@ -17,8 +17,8 @@ import { createProgram, requireUniform } from '@ldlework/gl/substrate'
 import type { DrawablePass, ResizablePass } from '@ldlework/gl'
 import type { DrawCtx } from '@ldlework/crt'
 
-import vsSrc from '../shaders/deposit.vert.glsl?raw'
-import fsSrc from '../shaders/deposit.frag.glsl?raw'
+import vsSrc from '../shaders/deposit.vert.glsl.gen'
+import fsSrc from '../shaders/deposit.frag.glsl.gen'
 
 /** Number of floats per segment in `SegmentBatch.data`. */
 export const SEGMENT_STRIDE = 6

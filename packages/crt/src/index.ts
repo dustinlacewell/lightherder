@@ -1,5 +1,6 @@
 /*
- * @ldlework/crt — phosphor effect pipeline + thin React mount.
+ * @ldlework/crt — the phosphor effect pipeline. Plain TypeScript, no
+ * React dependency.
  *
  * Crt is content-agnostic. It owns the *fixed* effect chain:
  *
@@ -14,16 +15,13 @@
  *
  * Two entrypoints:
  *
- *   1. <CrtSurface passes={(gl) => [...]} {...preset} />
+ *   1. `@ldlework/crt/react`'s <CrtSurface passes={(gl) => [...]} {...preset} />
  *      Drop-in React mount: canvas, GL context, Pipeline, rAF loop.
  *
- *   2. Construct `Pipeline` directly and drive it from your own loop.
- *      Use this on non-React hosts or when sharing a GL context with
- *      another renderer.
+ *   2. Construct `Pipeline` directly (from this entrypoint) and drive
+ *      it from your own loop. Use this on non-React hosts or when
+ *      sharing a GL context with another renderer.
  */
-
-// ─── React mount ───────────────────────────────────────────────────
-export { CrtSurface } from './CrtSurface'
 
 // ─── Phosphor coatings (presets) ───────────────────────────────────
 export {
@@ -39,6 +37,9 @@ export {
   type FrameInput,
   type PipelineOptions,
 } from './Pipeline'
+export { DecayPass } from './passes/DecayPass'
+export { HalationPass } from './passes/HalationPass'
+export { PresentPass } from './passes/PresentPass'
 export {
   StampPass,
   STAMP_STRIDE,
@@ -49,13 +50,13 @@ export { resolvePreset } from './resolve-preset'
 export { resolveThemeColor } from './theme-color'
 
 // ─── Types ─────────────────────────────────────────────────────────
+// CrtSurfaceProps and PassFactory are React-surface-shaped and re-
+// exported from `@ldlework/crt/react` instead.
 export type {
   CrtPreset,
-  CrtSurfaceProps,
   DrawCtx,
   ResolvedUniforms,
   PingPongTargets,
-  PassFactory,
 } from './types'
 
 // ─── Re-exports from @ldlework/gl (so consumers of our types don't ──

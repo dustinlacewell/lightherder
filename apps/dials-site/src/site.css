@@ -1,0 +1,191 @@
+/*
+ * Minimal page chrome. dials ships zero CSS by design — it doesn't know
+ * about DOM, React, or presentation — so this site's chrome is plain,
+ * not a phosphor pastiche. The demo panel below borrows just enough
+ * structure to read as a real parameter tree, nothing more.
+ */
+
+:root {
+  --bg: #0b0c0f;
+  --bg-raised: #15171c;
+  --fg: #e7e9ee;
+  --fg-dim: #9aa0ac;
+  --fg-faint: #5c6270;
+  --accent: #7ee0c0;
+  --rule: #262932;
+  --mono: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}
+
+#root {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+}
+
+.hero {
+  margin-bottom: 56px;
+}
+
+.hero-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 12px;
+}
+
+.hero-tagline {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  max-width: 32ch;
+}
+
+.hero-desc {
+  color: var(--fg-dim);
+  font-size: 16px;
+  max-width: 56ch;
+  margin: 0;
+}
+
+h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+  margin: 48px 0 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+}
+
+pre {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+p code {
+  background: var(--bg-raised);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--accent);
+}
+
+.links {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+  color: var(--fg-faint);
+  font-size: 13px;
+}
+
+/* ── Demo panel ─────────────────────────────────────────────────── */
+
+.demo-panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.demo-hint {
+  color: var(--fg-faint);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+[data-dials-panel] {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+[data-dials-slot] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dials-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dials-slot-label {
+  min-width: 6ch;
+  color: var(--fg-dim);
+}
+
+[data-dials-readonly] {
+  color: var(--accent);
+}
+
+[data-dials-attach] {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+input[type='number'] {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 6ch;
+}
+
+[data-dials-source] {
+  margin-left: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--rule);
+}

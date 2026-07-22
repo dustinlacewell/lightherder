@@ -13,9 +13,9 @@ import { openPopout } from './popout';
    being written — the oldest committed tap is 4 */
 const MAX_TAP = 4;
 
-export function Preview({ node, frozen, locked, setLocked, w, setW }: {
+export function Preview({ node, frozen, locked, setLocked, w, setW, fullscreen }: {
   node: PatchNode | null; frozen: boolean; locked: boolean; setLocked: (l: boolean) => void;
-  w: number; setW: (w: number | ((w: number) => number)) => void;
+  w: number; setW: (w: number | ((w: number) => number)) => void; fullscreen: boolean;
 }) {
   const [tap, setTap] = useState(0);
   const [popped, setPopped] = useState(false);
@@ -49,7 +49,11 @@ export function Preview({ node, frozen, locked, setLocked, w, setW }: {
   }, [popped, shownName]);
 
   return (
-    <aside className="preview" style={{ width: w }} ref={el => { if (el) addShield(el); }}>
+    <aside
+      className={"preview" + (fullscreen ? " pv-full" : "")}
+      style={fullscreen ? undefined : { width: w }}
+      ref={el => { if (el) addShield(el); }}
+    >
       <header className="pv-head">
         {node && <KindIcon kind={node.type} />}
         <span className="dev-name">{node ? node.data.name : 'select a screen'}</span>

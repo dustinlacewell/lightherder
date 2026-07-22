@@ -34,7 +34,7 @@ import {
 } from '../../patch';
 import { setDial, type Slot } from '@ldlework/dials';
 import { dropEntryMedia, libStore } from '../../persist';
-import { engineRef, expectEcho, mirror, releaseNode, type DispatchOpts } from '../../runtime';
+import { engineRef, expectEcho, mirror, notifyNodeWrite, releaseNode, type DispatchOpts } from '../../runtime';
 import * as midi from '../../midi';
 import { wire, type BenchEdge, type BenchNode } from './types';
 
@@ -175,6 +175,11 @@ export function useOps(deps: OpsDeps): (op: Op, opts: DispatchOpts) => Op {
     else {
       applyOp(root(), mirror.globals, libStore.doc, canon);
       writeParam(rf, op, canon);
+      /* the write landed behind React (silent, or an unmounted level) —
+         wake any mounted knob strip on this node so its face re-reads.
+         This is how a MIDI CC animates the dial it drives: the value
+         path stays render-free; only the display follows. */
+      if (isSlotValueOp(op) || op.kind === 'setSel') notifyNodeWrite(op.node);
       if (isStructural(canon)) {
         bumpDoc();
         /* an entry-scoped structural edit reshaped a shared definition:
@@ -289,6 +294,13 @@ function applyCanonical(
      recompile + cross-layer releases the pure applyOp couldn't do. */
   const effect = applyOp(root(), mirror.globals, libStore.doc, op);
   writeParamRemote(rf, op, scope, viewPrefix);
+  /* the value landed in place (writeParamRemote mutates node data under
+     React) — wake any mounted knob strip at the compiled address so the
+     display follows, exactly as the local silent branch does */
+  if (isSlotValueOp(op) || op.kind === 'setSel') {
+    const prefix = scope.kind === 'doc' ? prefixOf(scope.path) : viewPrefix;
+    notifyNodeWrite(op.rel !== undefined ? prefix + op.node + '/' + op.rel : prefix + op.node);
+  }
   if (op.kind === 'setParam' || op.kind === 'setSel') {
     if (scope.kind === 'entry') {
       /* a shared-default write: persist the library and recompile so

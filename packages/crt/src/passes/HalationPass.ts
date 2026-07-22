@@ -8,8 +8,9 @@
 import { createProgram, requireUniform } from '@ldlework/gl/substrate'
 import type { Pass, RenderTarget, ResizablePass } from '@ldlework/gl'
 
-import vsSrc from '../shaders/fullscreen.vert.glsl?raw'
-import fsSrc from '../shaders/halation.frag.glsl?raw'
+import vsSrc from '../shaders/fullscreen.vert.glsl.gen'
+import fsSrc from '../shaders/halation.frag.glsl.gen'
+import { halationStep } from '../math'
 import type { DrawCtx } from '../types'
 
 const TAPS = 8 // matches `const int R = 8` in halation.frag.glsl
@@ -41,10 +42,12 @@ export class HalationPass implements Pass, ResizablePass {
     haloV: RenderTarget,
   ): void {
     const gl = ctx.gl
-    const haloPxPerCssPx = (haloH.w / Math.max(ctx.canvasWidthPx, 1)) || 1
-    const haloRadiusFboPx = ctx.uniforms.haloSigmaPx * haloPxPerCssPx
-    const sigmaTaps = Math.max(0.5, haloRadiusFboPx / TAPS)
-    const stepMag = TAPS * sigmaTaps
+    const { sigmaTaps, stepMag } = halationStep({
+      haloSigmaPx: ctx.uniforms.haloSigmaPx,
+      haloWidthPx: haloH.w,
+      canvasWidthPx: ctx.canvasWidthPx,
+      taps: TAPS,
+    })
 
     gl.useProgram(this.program)
 

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useCallback, useRef } from 'react'
-import { CrtSurface, type DrawablePass, type DrawCtx } from '@ldlework/crt'
+import { CrtSurface } from '@ldlework/crt/react'
+import type { DrawablePass, DrawCtx } from '@ldlework/crt'
 import { DepositPass, makeSegmentPump, type BeamFn, type SegmentPump } from '@ldlework/scope'
 
 /**

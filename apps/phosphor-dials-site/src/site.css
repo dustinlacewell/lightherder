@@ -1,0 +1,189 @@
+/*
+ * Site-level layout + typography. The libraries bring the chrome and
+ * glass (phosphor) and the dial tree (phosphor-dials); this file brings
+ * the surrounding page furniture — background, type scale, section
+ * rhythm — hue-locked to phosphor's --theme-hue so the page and the
+ * chassis live in one OKLCH world.
+ */
+
+:root {
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+
+  /* Chroma is intentionally very low — the room is tinted, not coloured.
+     The lit pixels of the chassis carry the saturation. */
+  --site-bg: oklch(0.13 0.025 var(--theme-hue));
+  --site-fg: oklch(0.88 0.012 var(--theme-hue));
+  --site-fg-dim: oklch(0.68 0.018 var(--theme-hue));
+  --site-fg-faint: oklch(0.48 0.014 var(--theme-hue));
+  --site-rule: oklch(0.78 0.04 var(--theme-hue) / 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.site,
+.site-container,
+.site-section {
+  min-width: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--site-bg);
+  color: var(--site-fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--theme-lit-bright);
+  text-decoration: none;
+  text-shadow: 0 0 4px var(--theme-lit-glow);
+}
+
+a:hover { color: var(--theme-lit); }
+
+/* ── Page rhythm ─────────────────────────────────────────────────── */
+
+.site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-section {
+  width: 100%;
+  padding: 48px 24px;
+}
+
+@media (max-width: 600px) {
+  .site-section { padding: 36px 14px; }
+}
+
+.site-container {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.site-container--narrow { max-width: 720px; }
+
+/* ── Type scale ──────────────────────────────────────────────────── */
+
+.site-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--theme-lit);
+  text-shadow: 0 0 4px var(--theme-lit-glow);
+  margin: 0 0 12px 0;
+}
+
+.site-h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0 0 18px 0;
+  max-width: 22ch;
+  color: var(--site-fg);
+}
+
+.site-h2 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px 0;
+  color: var(--site-fg);
+}
+
+.site-prose {
+  color: var(--site-fg-dim);
+  max-width: 62ch;
+}
+
+.site-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: oklch(0.78 0.04 var(--theme-hue) / 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--theme-lit-bright);
+}
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+
+.site-hero {
+  padding-top: 72px;
+  padding-bottom: 24px;
+}
+
+.site-hero-desc {
+  margin-top: 0;
+}
+
+.site-links {
+  display: flex;
+  gap: 24px;
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+/* ── Demo + install ──────────────────────────────────────────────── */
+
+.site-demo-hint {
+  margin: 0 0 24px 0;
+}
+
+/*
+ * This page's own layout choice, not a phosphor-dials default: lay the
+ * demo panel's slots out side by side instead of the library's default
+ * stacked column, so all three synth dials read at a glance. Overrides
+ * phosphor-dials' own `.dials-panel { flex-direction: column }`.
+ */
+.pd-demo-horizontal .dials-panel {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.pd-demo-horizontal .pd-row {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.site-install-prose {
+  margin: 20px 0 12px 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+
+.site-footer {
+  margin-top: auto;
+  padding: 48px 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--site-fg-faint);
+  border-top: 1px solid var(--site-rule);
+}
+
+.site-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 8px;
+}

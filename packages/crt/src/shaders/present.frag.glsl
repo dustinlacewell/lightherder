@@ -8,8 +8,10 @@
  *
  *   accum     = HDR scalar (deposit writes equal RGB, so .r == .g == .b)
  *   halo      = blurred copy at lower res
- *   intensity = accum.r + halo.r * uHaloI
- *   color     = phosphorColor * intensity
+ *   haloColor = phosphorColor, warmed toward an amber reference by
+ *               uHaloTint — real halation scatters through the glass
+ *               envelope and skews warmer than the trace itself.
+ *   color     = phosphorColor * accum + haloColor * halo * uHaloI
  *             + (whitePoint - phosphorColor) * smoothstep(knee, knee+slope, intensity) * intensity
  *
  * The result tonemaps softly past 1.0 with an ACES-style shoulder.
@@ -21,7 +23,7 @@ in vec2 vUv;
 uniform sampler2D uAccum;
 uniform sampler2D uHalo;
 uniform float uHaloI;
-uniform float uHaloTint;       // reserved for future taste knob
+uniform float uHaloTint;       // 0 = halo matches phosphor color, 1 = full amber warmth
 uniform float uSatKnee;
 uniform float uWhiteHot;
 uniform float uGrain;
@@ -45,13 +47,18 @@ vec3 filmic(vec3 x) {
   return clamp((x*(a*x+b)) / (x*(c*x+d)+e), 0.0, 1.0);
 }
 
+// Reference warm-amber hue the halo skews toward as uHaloTint → 1.
+const vec3 HALO_WARM = vec3(1.0, 0.55, 0.2);
+
 void main() {
   float accum = texture(uAccum, vUv).r;
   float halo  = texture(uHalo, vUv).r * uHaloI;
   float I = accum + halo;
 
-  // Base: pure phosphor color scaled by intensity.
-  vec3 color = uPhosphorColor * I;
+  // Halo color warms toward HALO_WARM independent of the trace color;
+  // the core trace (accum) always stays pure phosphor color.
+  vec3 haloColor = mix(uPhosphorColor, HALO_WARM, clamp(uHaloTint, 0.0, 1.0));
+  vec3 color = uPhosphorColor * accum + haloColor * halo;
 
   // Bleach-to-white only at the very brightest cores. The knee is
   // configurable; default sits well above 1.0 so only the extrema
@@ -84,7 +91,4 @@ void main() {
   // touching the underlying glass.
   float a = clamp(max(max(color.r, color.g), color.b), 0.0, 1.0) * uAlpha;
   outColor = vec4(color * uAlpha, a);
-
-  // Silence the unused-uniform warning without spending a sampler.
-  if (uHaloTint < -1.0) discard;
 }

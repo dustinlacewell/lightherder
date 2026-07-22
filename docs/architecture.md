@@ -34,8 +34,8 @@ rendering       crt       @ldlework/crt             WebGL beam renderer — accu
 design-system   phosphor        @ldlework/phosphor        chrome chassis, OLED glass, chips, fonts, theming
                 phosphor-dials  @ldlework/phosphor-dials  phosphor-styled component set for the dials Panel
                             │        (depends on dials, phosphor)
-apps            docs      @ldlework/phosphor-docs   Storybook playground for phosphor
-                site      @ldlework/phosphor-site   hero demo — composes scope + dials + crt + phosphor
+apps            docs           @ldlework/phosphor-docs   Storybook playground for phosphor
+                phosphor-site  @ldlework/phosphor-site   hero demo — composes scope + dials + crt + phosphor
 ```
 
 ## Package responsibilities

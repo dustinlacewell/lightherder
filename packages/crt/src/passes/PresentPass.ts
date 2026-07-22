@@ -8,8 +8,8 @@
 import { createProgram, requireUniform } from '@ldlework/gl/substrate'
 import type { Pass, ResizablePass } from '@ldlework/gl'
 
-import vsSrc from '../shaders/fullscreen.vert.glsl?raw'
-import fsSrc from '../shaders/present.frag.glsl?raw'
+import vsSrc from '../shaders/fullscreen.vert.glsl.gen'
+import fsSrc from '../shaders/present.frag.glsl.gen'
 import type { DrawCtx } from '../types'
 
 // PresentPass also has a custom signature (drawToScreen(ctx, accumTex,

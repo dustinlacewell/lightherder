@@ -45,6 +45,9 @@ export function Bench() {
   const { frozen, setFrozen, stepTick } = useFreeze();
   const [midiLogOpen, setMidiLogOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
+  /* fullscreen preview: Tab swaps the whole bench for a single full-viewport
+     monitor of the pinned screen and back (see the Tab listener below) */
+  const [fullscreen, setFullscreen] = useState(false);
   const rf = useReactFlow();
   const rfStore = useStoreApi();
   useFollow(bench.goTo);
@@ -87,6 +90,22 @@ export function Bench() {
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, [copySelection, pasteSelection, canWrite, rf]);
+
+  /* Tab globally flips between the full bench and a full-viewport preview
+     of the pinned screen. It's a naked Tab (no modifier), so we guard the
+     places Tab means something else — text fields and knob drags — and
+     eat the default focus-traversal everywhere else. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const el = e.target as HTMLElement;
+      if (el.closest('input, textarea, .knob')) return;
+      e.preventDefault();
+      setFullscreen(f => !f);
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
 
   /* the session reaches the document and the live-swap rebuild through
      this seam alone — never into React. `rebuild` is unused until the
@@ -153,7 +172,7 @@ export function Bench() {
   return (
     <PanelComponentsProvider value={herderPanelComponents}>
     <div
-      className={"bench" + (wiring ? ` wiring-${wiring}` : "")}
+      className={"bench" + (wiring ? ` wiring-${wiring}` : "") + (fullscreen ? " fullscreen" : "")}
       /* presence: the pointer in flow space, streamed to the room. The
          wrapper sees every move — pane, nodes, mid-drag (RF's pointer
          capture still bubbles through it) — and the rAF coalescer in
@@ -293,7 +312,7 @@ export function Bench() {
       </div>
       <GlobalsBar onSave={persist} />
       <LibraryPanel onSaveHere={saveHere} onOpen={bench.enterLib} root={bench.root} />
-      <Preview node={pin.shown} frozen={frozen} locked={pin.locked} setLocked={pin.setLocked} w={pin.w} setW={pin.setW} />
+      <Preview node={pin.shown} frozen={frozen} locked={pin.locked} setLocked={pin.setLocked} w={pin.w} setW={pin.setW} fullscreen={fullscreen} />
       {midiLogOpen && <MidiLog onClose={() => setMidiLogOpen(false)} />}
       {sessionOpen && <SessionPanel deps={sessionDeps} onClose={() => setSessionOpen(false)} />}
     </div>

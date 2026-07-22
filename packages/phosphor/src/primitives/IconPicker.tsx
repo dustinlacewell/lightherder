@@ -99,6 +99,13 @@ interface HoverCardProps {
   anchorSelector?: string | undefined
   /** While true the card never shows (and hides if showing). */
   disabled?: boolean | undefined
+  /**
+   * Height guess the flip/clamp math plans around (default 110). Cards
+   * size to content after render, so a card known to run tall (e.g.
+   * one carrying a preview image) passes its real height here to keep
+   * its bottom on-screen.
+   */
+  estimatedHeight?: number | undefined
   className?: string
 }
 
@@ -151,6 +158,7 @@ export function HoverCard({
   placement = 'below',
   anchorSelector,
   disabled = false,
+  estimatedHeight = CARD_ESTIMATED_H,
   className = '',
 }: HoverCardProps) {
   const hostRef = useRef<HTMLSpanElement | null>(null)
@@ -196,6 +204,7 @@ export function HoverCard({
           host.getBoundingClientRect(),
           anchor.getBoundingClientRect(),
           placement,
+          estimatedHeight,
         ),
       )
     }
@@ -206,7 +215,7 @@ export function HoverCard({
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, placement, anchorSelector])
+  }, [open, placement, anchorSelector, estimatedHeight])
 
   return (
     <>
@@ -255,14 +264,15 @@ function computeCardPosition(
   target: DOMRect,
   anchor: DOMRect,
   placement: 'below' | 'side',
+  estH: number = CARD_ESTIMATED_H,
 ): CardPos {
   const vw = window.innerWidth
   const vh = window.innerHeight
 
   if (placement === 'side') {
     let top = target.top
-    if (top + CARD_ESTIMATED_H > vh - CARD_MARGIN) {
-      top = vh - CARD_MARGIN - CARD_ESTIMATED_H
+    if (top + estH > vh - CARD_MARGIN) {
+      top = vh - CARD_MARGIN - estH
     }
     if (top < CARD_MARGIN) top = CARD_MARGIN
     const left = anchor.right + CARD_GAP
@@ -274,10 +284,9 @@ function computeCardPosition(
   }
 
   const belowTop = target.bottom + CARD_GAP
-  const wantsAbove = belowTop + CARD_ESTIMATED_H + CARD_MARGIN > vh
-  const above =
-    wantsAbove && target.top - CARD_GAP - CARD_ESTIMATED_H > CARD_MARGIN
-  const top = above ? target.top - CARD_GAP - CARD_ESTIMATED_H : belowTop
+  const wantsAbove = belowTop + estH + CARD_MARGIN > vh
+  const above = wantsAbove && target.top - CARD_GAP - estH > CARD_MARGIN
+  const top = above ? target.top - CARD_GAP - estH : belowTop
 
   // Right edges aligned; clamp the pin inside the viewport.
   let right = vw - target.right

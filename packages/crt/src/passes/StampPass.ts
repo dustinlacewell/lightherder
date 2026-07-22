@@ -19,8 +19,8 @@
 import { createProgram, requireUniform } from '@ldlework/gl/substrate'
 import type { DrawablePass, ResizablePass } from '@ldlework/gl'
 
-import vsSrc from '../shaders/stamp.vert.glsl?raw'
-import fsSrc from '../shaders/stamp.frag.glsl?raw'
+import vsSrc from '../shaders/stamp.vert.glsl.gen'
+import fsSrc from '../shaders/stamp.frag.glsl.gen'
 import type { DrawCtx } from '../types'
 
 /** One stamp to paint this frame. */

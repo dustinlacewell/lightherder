@@ -22,14 +22,14 @@
        "nodeId:param" key the engine publishes to. A SlotRow prop, so it
        closes over the node id directly in Shell — no context needed. */
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { Slot } from '@ldlework/dials';
 import {
   SlotActionsProvider, type LiveOverride, type SlotActions,
 } from '@ldlework/dials/react';
 import { makeDialPanelComponents } from '@ldlework/phosphor-dials';
 import { libHead, resolveSlot } from '../../patch';
-import { dispatch, liveValue, mirror } from '../../runtime';
+import { dispatch, liveValue, mirror, watchNodeWrites } from '../../runtime';
 import { SlotChrome } from './SlotChrome';
 
 /* the level-local op target: the shell holds the compiled view id, and
@@ -127,6 +127,22 @@ function fullActions(a: Partial<SlotActions>): SlotActions {
     setMode: a.setMode ?? noop,
     setGlide: a.setGlide ?? noop,
   };
+}
+
+/* ---- following writes that land behind React --------------------------- */
+
+/** repaint a node's knob strip whenever a silent op writes its values in
+    place (a MIDI CC, a remote peer's value) — the SlotRows read their
+    slots at render, so one repaint fans every knob's re-read. Coalesced
+    to one repaint per frame: a CC burst outruns the paint rate. */
+export function useNodeWriteRepaint(id: string, repaint: () => void): void {
+  useEffect(() => {
+    let raf = 0;
+    const off = watchNodeWrites(id, () => {
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; repaint(); });
+    });
+    return () => { off(); if (raf) cancelAnimationFrame(raf); };
+  }, [id, repaint]);
 }
 
 /* ---- live override: the control-port wire's engine truth --------------- */

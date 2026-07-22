@@ -1,0 +1,156 @@
+/*
+ * Minimal page chrome. scope ships zero CSS by design — it doesn't know
+ * about DOM, React, or presentation — so this site's chrome is plain,
+ * not a phosphor pastiche. The demo below borrows just enough structure
+ * to frame the CRT surface, nothing more.
+ */
+
+:root {
+  --bg: #0b0c0f;
+  --bg-raised: #15171c;
+  --fg: #e7e9ee;
+  --fg-dim: #9aa0ac;
+  --fg-faint: #5c6270;
+  --accent: #7ee0c0;
+  --rule: #262932;
+  --mono: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}
+
+#root {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+}
+
+.hero {
+  margin-bottom: 56px;
+}
+
+.hero-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 12px;
+}
+
+.hero-tagline {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  max-width: 32ch;
+}
+
+.hero-desc {
+  color: var(--fg-dim);
+  font-size: 16px;
+  max-width: 56ch;
+  margin: 0;
+}
+
+h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+  margin: 48px 0 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+}
+
+pre {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+p code {
+  background: var(--bg-raised);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--accent);
+}
+
+.links {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+ul {
+  color: var(--fg-dim);
+  padding-left: 20px;
+  max-width: 60ch;
+}
+
+ul li {
+  margin-bottom: 10px;
+}
+
+ul code {
+  color: var(--accent);
+}
+
+footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+  color: var(--fg-faint);
+  font-size: 13px;
+}
+
+/* ── Demo panel ─────────────────────────────────────────────────── */
+
+.demo-panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.demo-hint {
+  color: var(--fg-faint);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.scope-frame {
+  width: 360px;
+  height: 360px;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+}

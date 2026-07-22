@@ -47,6 +47,31 @@ export function watchLive(target: string, cb: () => void): () => void {
   return () => { set!.delete(cb); if (!set!.size) liveWatchers.delete(target); };
 }
 
+/* ---- in-place value writes --------------------------------------------
+   A silent op (a MIDI CC, a remote peer's value) mutates a node's slots
+   in place with nothing observable to React — the knob face would sit on
+   its last rendered position while the emitted value moves. The applier
+   notifies here after landing one; a mounted strip of SlotRows watches
+   its own node id and re-reads. Keyed by compiled node id (the id the
+   mounted components hold); an unmounted level notifies no one. */
+
+const writeWatchers = new Map<string, Set<() => void>>();
+
+/** applier only: a value op just landed on this node's data in place —
+    behind React — so any mounted display must re-read */
+export function notifyNodeWrite(id: string): void {
+  for (const cb of writeWatchers.get(id) ?? []) cb();
+}
+
+/** a node's knob strip subscribes to its own compiled id — called
+    whenever a silent op writes the node's values in place */
+export function watchNodeWrites(id: string, cb: () => void): () => void {
+  let set = writeWatchers.get(id);
+  if (!set) writeWatchers.set(id, set = new Set());
+  set.add(cb);
+  return () => { set!.delete(cb); if (!set!.size) writeWatchers.delete(id); };
+}
+
 /* ---- the tick pulse ---------------------------------------------------
    Some followers track engine-resolved values that live outside the
    live map — the xypad's lag puck reads its slot's own lastSample.

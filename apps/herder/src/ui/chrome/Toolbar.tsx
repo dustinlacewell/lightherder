@@ -1,13 +1,17 @@
 /* The device toolbar — drag a tool onto the bench, or click to drop
    it mid-view. Vertical tabs down the rail switch between the device
-   categories; only the active category's tools show. */
+   categories; only the active category's tools show. Hovering a tool
+   opens a card beside the panel — name, story, and for an effect a
+   live preview running it over the stained glass (fxPreview.ts). */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { HoverCard } from '@ldlework/phosphor';
 import type { MakeOpts, NodeKind } from '../../patch';
 import { announcePresence } from '../../session';
 import { DND_MIME, hideDragImage } from '../bench/dnd';
 import { KindIcon } from '../nodes';
 import { FX } from '../../fx';
+import { mountFxPreview } from './fxPreview';
 
 const CATS = ['Compose', 'Effects', 'Route', 'Control', 'Sources', 'IO'] as const;
 type Cat = (typeof CATS)[number];
@@ -33,8 +37,29 @@ const TOOLS: { cat: Cat; kind: NodeKind; momentary: boolean; label: string; hint
   { cat: 'IO', kind: 'out', momentary: false, label: 'Out', hint: 'Out — declares a module output port for this patch; its name is the port label' },
 ];
 
+/* the hover card's body: name, the tool's story, and — for an effect —
+   the live preview canvas adopted into the well while the card is up */
+function ToolCard({ label, hint, kind }: { label: string; hint: string; kind: NodeKind }) {
+  const wellRef = useRef<HTMLDivElement | null>(null);
+  const fx = kind in FX;
+  useEffect(() => {
+    const well = wellRef.current;
+    if (!fx || !well) return;
+    return mountFxPreview(well, kind as keyof typeof FX);
+  }, [fx, kind]);
+  return (
+    <>
+      {fx ? <div ref={wellRef} /> : null}
+      <strong>{label}</strong>
+      <span>{hint.replace(/^[^—]*—\s*/, '')}</span>
+      <span className="tool-card-coda">drag onto the bench, or click to drop it mid-view</span>
+    </>
+  );
+}
+
 export function Toolbar({ onSpawn }: { onSpawn: (kind: NodeKind, opts: MakeOpts, sx: number, sy: number) => void }) {
   const [cat, setCat] = useState<Cat>('Compose');
+  const [dragging, setDragging] = useState(false);
   return (
     <nav className="toolbar" aria-label="Devices">
       <div className="tool-tabs" role="tablist" aria-label="Device categories">
@@ -50,23 +75,35 @@ export function Toolbar({ onSpawn }: { onSpawn: (kind: NodeKind, opts: MakeOpts,
       </div>
       <div className="tool-list" role="tabpanel">
         {TOOLS.filter(t => t.cat === cat).map(t => (
-          <button
+          <HoverCard
             key={t.label}
-            className="tool"
-            title={`${t.hint} — drag onto the bench, or click to drop it mid-view`}
-            draggable
-            /* the drag carries no native snapshot — the presence spawn ghost
-               renders the real chassis at the drop anchor instead, for the
-               local dragger and the peers alike; dragend fires on drop OR
-               cancel, so the ghost always clears */
-            onDragStart={e => {
-              e.dataTransfer.setData(DND_MIME, `${t.kind}|${t.momentary ? 1 : 0}`);
-              hideDragImage(e);
-              announcePresence({ spawn: { kind: t.kind, label: t.label, mom: t.momentary || undefined } });
-            }}
-            onDragEnd={() => announcePresence({ spawn: undefined })}
-            onClick={() => onSpawn(t.kind, { momentary: t.momentary }, window.innerWidth / 2, window.innerHeight / 2)}
-          ><KindIcon kind={t.kind} />{t.label}</button>
+            placement="side"
+            anchorSelector=".toolbar"
+            disabled={dragging}
+            /* an effect card runs tall — the preview canvas above the words */
+            estimatedHeight={t.kind in FX ? 232 : undefined}
+            content={<ToolCard label={t.label} hint={t.hint} kind={t.kind} />}
+          >
+            <button
+              className="tool"
+              draggable
+              /* the drag carries no native snapshot — the presence spawn ghost
+                 renders the real chassis at the drop anchor instead, for the
+                 local dragger and the peers alike; dragend fires on drop OR
+                 cancel, so the ghost always clears */
+              onDragStart={e => {
+                e.dataTransfer.setData(DND_MIME, `${t.kind}|${t.momentary ? 1 : 0}`);
+                hideDragImage(e);
+                setDragging(true);
+                announcePresence({ spawn: { kind: t.kind, label: t.label, mom: t.momentary || undefined } });
+              }}
+              onDragEnd={() => {
+                setDragging(false);
+                announcePresence({ spawn: undefined });
+              }}
+              onClick={() => onSpawn(t.kind, { momentary: t.momentary }, window.innerWidth / 2, window.innerHeight / 2)}
+            ><KindIcon kind={t.kind} />{t.label}</button>
+          </HoverCard>
         ))}
       </div>
     </nav>

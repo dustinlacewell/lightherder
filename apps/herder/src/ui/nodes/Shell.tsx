@@ -8,7 +8,7 @@ import { SlotRow } from '@ldlework/dials/react';
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { DRAWER, PARAMS, type NodeData, type NodeKind } from '../../patch';
 import { dispatch, releaseNode, setFace, spark, tap, watchLive } from '../../runtime';
-import { SlotNodeProvider, liveOverrideFor } from '../controls/dialsBundle';
+import { SlotNodeProvider, liveOverrideFor, useNodeWriteRepaint } from '../controls/dialsBundle';
 import { KindIcon } from './icons';
 
 /* every op the shell emits addresses its node by the compiled view id
@@ -191,6 +191,9 @@ function Drawer({ id, kind, data, exposed }: {
      every KnobSlider's rAF poll on any sibling knob's edit (one knob's
      op re-renders the whole node), blipping their live samples */
   const live = useMemo(() => liveOverrideFor(id), [id]);
+  /* a MIDI CC (or a remote value) writes a drawer slot behind React —
+     this is the "REMOTE op bumps it" leg of the contract above */
+  useNodeWriteRepaint(id, repaint);
 
   /* a wire riding an exposed param starts/stops publishing under
      "id:key"; the SlotRow's liveOverride reads that presence at render,

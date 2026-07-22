@@ -16,23 +16,13 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { Pipeline } from './Pipeline'
-import { acquireGl } from './gl-context'
-import { sizeCanvasBacking, attachFitter } from './canvas-fit'
-import { resolvePreset } from './resolve-preset'
-import { resolveThemeColor } from './theme-color'
-import type { CrtPreset, CrtSurfaceProps, DrawCtx } from './types'
+import { Pipeline } from '../Pipeline'
+import { acquireGl } from '../gl-context'
+import { sizeCanvasBacking, attachFitter } from '../canvas-fit'
+import { resolvePreset } from '../resolve-preset'
+import { resolveThemeColor } from '../theme-color'
+import type { CrtPreset, CrtSurfaceProps, DrawCtx } from '../types'
 import type { DrawablePass } from '@ldlework/gl'
-
-// Re-imports of `.glsl?raw` modules invalidate compiled WebGLPrograms
-// without recompiling them — accept HMR here at the top of the shader
-// transitive-dep graph and full-reload the page so the new shader
-// strings actually take effect.
-if (import.meta.hot) {
-  import.meta.hot.accept(() => {
-    window.location.reload()
-  })
-}
 
 export function CrtSurface(props: CrtSurfaceProps) {
   const { className, style } = props

@@ -11,7 +11,7 @@ import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI,
 import { dispatch, holdSwitch, mirror, releaseSwitch, watchTick } from '../../runtime';
 import { FX } from '../../fx';
 import { ArcGauge, XYPad } from '../controls/Knob';
-import { SlotNodeProvider, dialFaceComponents, liveOverrideFor } from '../controls/dialsBundle';
+import { SlotNodeProvider, dialFaceComponents, liveOverrideFor, useNodeWriteRepaint } from '../controls/dialsBundle';
 import type { DeviceProps } from '../bench/types';
 import { CPort, Face, ResetBtn, Shell, useSetParam, VPort, type FixedPort } from './Shell';
 import { FlavorBtn, useFlavorHandles } from './modules';
@@ -229,6 +229,9 @@ export function DialNode({ id, data }: DeviceProps) {
   const live = useMemo(() => liveOverrideFor(id), [id]);
   const node = useMemo(() => ({ id }), [id]);
   const val = data.slots.val as Slot<number>;
+  /* a MIDI CC (or a remote value) writes the val slot behind React —
+     follow it so the knob face animates with what the dial emits */
+  useNodeWriteRepaint(id, repaint);
   /* view edges are only the invalidation signal — the walk reads the mirror */
   const edges = useStore(s => s.edges);
   const uni = useMemo(() => dialPolarity(id, 'c:out') === 'uni', [id, edges]);
