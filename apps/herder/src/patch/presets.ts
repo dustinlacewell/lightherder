@@ -15,7 +15,11 @@ function patchBuilder() {
     const n = makeNode(kind, x, y, nodes);
     n.data.name = name;
     n.data.sel = sel;
-    for (const [k, val] of Object.entries(v)) setDial(n.data.slots[k] as Slot<number>, val);
+    for (const [k, val] of Object.entries(v)) {
+      const slot = n.data.slots[k] as Slot<number> | undefined;
+      if (!slot) throw new Error(`preset seeds unknown param "${k}" on a ${kind}`);
+      setDial(slot, val);
+    }
     nodes.push(n);
     return n;
   };
@@ -65,7 +69,8 @@ export function piecePatch(): SubPatch {
   const rolF = add('mixer', 'ROLAND F', -40, 940, { mode: 1 });
   const monF1 = add('monitor', 'ROT MON 1', 250, 940);
   const camF = add('camera', 'CANON', 540, 940, { ...CAMCORDER });
-  const monF2 = add('monitor', 'ROT MON 2', 830, 940, { delay: 3 });
+  const bmd = add('delay', 'BLACKMAGIC', 830, 720, { frames: 3 });
+  const monF2 = add('monitor', 'ROT MON 2', 830, 940);
   const camP = add('camera', 'MEDIA CAM', 1120, 940, { ...CAMCORDER });
 
   /* the handle (belt-linked: one pair of dials, both tower cameras)
@@ -107,9 +112,11 @@ export function piecePatch(): SubPatch {
     makeEdge(rolF.id, 'v:out', monF1.id, 'v:in'),
     makeEdge(monF1.id, 'v:out', camF.id, 'v:in'),
 
-    /* the media loop: Canon relayed through the Blackmagic to rotating
-       monitor 2, watched by the media's camera, back into SW4 */
-    makeEdge(camF.id, 'v:out', monF2.id, 'v:in'),
+    /* the media loop: Canon relayed through the Blackmagic (a delay
+       frame store) to rotating monitor 2, watched by the media's
+       camera, back into SW4 */
+    makeEdge(camF.id, 'v:out', bmd.id, 'v:in'),
+    makeEdge(bmd.id, 'v:out', monF2.id, 'v:in'),
     makeEdge(monF2.id, 'v:out', camP.id, 'v:in'),
 
     /* the handle: one dial pair, both tower rods (the belt) */
@@ -135,7 +142,8 @@ export function duoPatch(): SubPatch {
   const mix1 = add('mixer', 'ROLAND 1', 40, 120, { mode: 1 });
   const mon1 = add('monitor', 'ROT MON 1', 340, 120);
   const cam1 = add('camera', 'CANON', 640, 120, { ...CAMCORDER });
-  const mon2 = add('monitor', 'ROT MON 2', 640, 470, { delay: 3 });
+  const bmd = add('delay', 'BLACKMAGIC', 640, 300, { frames: 3 });
+  const mon2 = add('monitor', 'ROT MON 2', 640, 470);
   const cam2 = add('camera', 'MEDIA CAM', 340, 470, { ...CAMCORDER });
   const sw1 = add('switch', 'ROLAND 2', 40, 470);
   const media1 = add('media', 'MEDIA', -240, 500);
@@ -148,7 +156,8 @@ export function duoPatch(): SubPatch {
     makeEdge(mix1.id, 'v:out', mon1.id, 'v:in'),     // Roland 1 → rotating monitor 1
     makeEdge(mon1.id, 'v:out', cam1.id, 'v:in'),     // the Canon watches it
     makeEdge(cam1.id, 'v:out', mix1.id, 'v:a'),      // its own loop is the key base
-    makeEdge(cam1.id, 'v:out', mon2.id, 'v:in'),     // and relays through the Blackmagic
+    makeEdge(cam1.id, 'v:out', bmd.id, 'v:in'),      // and relays through the Blackmagic
+    makeEdge(bmd.id, 'v:out', mon2.id, 'v:in'),      // (a delay frame store)
     makeEdge(mon2.id, 'v:out', cam2.id, 'v:in'),     // the media's camera watches monitor 2
     makeEdge(cam2.id, 'v:out', sw1.id, 'v:in1'),     // its loop is the switch's home
     makeEdge(media1.id, 'v:out', sw1.id, 'v:in2'),   // the media waits on position 2
