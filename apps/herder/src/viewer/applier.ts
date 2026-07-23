@@ -88,7 +88,8 @@ function applyViewer(op: Op, _opts: DispatchOpts): Op {
        legitimately drop — that is the semantics. */
     if (op.globals) {
       mirror.globals = op.globals;
-      engineRef.current?.setResolution((op.globals.res as Slot<number>).dial.value);
+      const resSlot = op.globals.res as Slot<number> | undefined;
+      if (resSlot) engineRef.current?.setResolution(resSlot.dial.value);
     }
     viewerRebuild(op.patch);
     return op;
