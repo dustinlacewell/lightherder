@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import '@ldlework/phosphor/styles.css'
+import '@ldlework/phosphor-dials/styles.css'
 import './site.css'
 import { App } from './App'
 

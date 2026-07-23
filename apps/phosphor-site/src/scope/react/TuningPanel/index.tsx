@@ -7,6 +7,7 @@
 import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Panel } from '@ldlework/dials/react'
+import { makeDialPanelComponents } from '@ldlework/phosphor-dials'
 import type { HeroPreset } from '../../preset/hero-preset'
 import {
   addBurst,
@@ -23,6 +24,9 @@ import type { FundamentalDials } from '../../signal/fundamental-dials'
 import { Tabs, ChildTabbed } from './tabs'
 import { WaveActions } from './wave-actions'
 import { TUNING_CSS } from './styles'
+
+/** Compact knobs for the overlay's narrow scrolling column. */
+const tuningComponents = makeDialPanelComponents({ knobSize: 44, caption: 'below' })
 
 export interface TuningPanelProps {
   preset: HeroPreset
@@ -69,7 +73,7 @@ function TuningPanelInner({ preset, onChange, setPreset, endpoint }: TuningPanel
 
         {top === 'screen' && (
           <div className="hero-body">
-            <Panel dials={preset.screen} onChange={onChange} />
+            <Panel dials={preset.screen} components={tuningComponents} onChange={onChange} />
           </div>
         )}
         {top === 'waves' && (
@@ -77,7 +81,7 @@ function TuningPanelInner({ preset, onChange, setPreset, endpoint }: TuningPanel
         )}
         {top === 'pointer' && (
           <div className="hero-body">
-            <Panel dials={preset.pointer} onChange={onChange} />
+            <Panel dials={preset.pointer} components={tuningComponents} onChange={onChange} />
           </div>
         )}
 
@@ -200,9 +204,9 @@ function WaveSectionPane({
       />
 
       <div className="hero-body">
-        {waveTab === 'beam'  && <Panel dials={wave.beam}       onChange={onChange} />}
-        {waveTab === 'sweep' && <Panel dials={wave.sweep}      onChange={onChange} />}
-        {waveTab === 'noise' && <Panel dials={wave.noiseFloor} onChange={onChange} />}
+        {waveTab === 'beam'  && <Panel dials={wave.beam}       components={tuningComponents} onChange={onChange} />}
+        {waveTab === 'sweep' && <Panel dials={wave.sweep}      components={tuningComponents} onChange={onChange} />}
+        {waveTab === 'noise' && <Panel dials={wave.noiseFloor} components={tuningComponents} onChange={onChange} />}
 
         {waveTab === 'fundamentals' && (
           <ChildTabbed
@@ -224,7 +228,7 @@ function WaveSectionPane({
                 : undefined
             }
             renderActive={(f: FundamentalDials) => (
-              <Panel dials={f} onChange={onChange} />
+              <Panel dials={f} components={tuningComponents} onChange={onChange} />
             )}
           />
         )}
@@ -249,7 +253,7 @@ function WaveSectionPane({
                 : undefined
             }
             renderActive={(b: BurstDials) => (
-              <Panel dials={b} onChange={onChange} />
+              <Panel dials={b} components={tuningComponents} onChange={onChange} />
             )}
             emptyHint="No bursts yet. Hit + to add one."
           />

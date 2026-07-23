@@ -133,3 +133,19 @@ describe('registry', () => {
     expect(getSource('test.add')).toBe(replacement)
   })
 })
+
+describe('stateful per-tick guard', () => {
+  it('advances once per tick — repeated samples at the same t are cached', () => {
+    const c = instantiate(counter)
+    expect(sampleSource(c, { t: 0, dt: 1 })).toBe(1)
+    expect(sampleSource(c, { t: 0, dt: 1 })).toBe(1) // no re-advance
+    expect(sampleSource(c, { t: 1, dt: 1 })).toBe(2)
+    expect(sampleSource(c, { t: 1, dt: 1 })).toBe(2)
+  })
+
+  it('keeps advancing per call when ctx has no numeric t', () => {
+    const c = instantiate(counter)
+    expect(sampleSource(c, {})).toBe(1)
+    expect(sampleSource(c, {})).toBe(2)
+  })
+})

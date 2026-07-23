@@ -5,16 +5,41 @@ import { defineConfig } from 'vite'
 // Deployed at https://<user>.github.io/scope/ — set the base via
 // VITE_BASE at build time.
 //
-// Resolve `@ldlework/scope` (and its crt/gl deps) to their TS sources
-// (not the built dist) so HMR picks up library changes instantly in
-// dev. The published packages still consume from `dist/` — these
-// aliases only affect this site. More-specific subpaths (crt/react)
-// come first: Vite matches aliases in array order.
+// Resolve the workspace libraries (scope, crt, gl, dials, phosphor,
+// phosphor-dials) to their TS/CSS sources (not the built dist) so HMR
+// picks up library changes instantly in dev. The published packages
+// still consume from `dist/` — these aliases only affect this site.
+// More-specific subpaths (crt/react, dials/react, */styles.css) come
+// first: Vite matches aliases in array order.
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
   plugins: [react()],
   resolve: {
     alias: [
+      {
+        find: '@ldlework/dials/react',
+        replacement: resolve(__dirname, '../../packages/dials/src/react/index.ts'),
+      },
+      {
+        find: '@ldlework/dials',
+        replacement: resolve(__dirname, '../../packages/dials/src/index.ts'),
+      },
+      {
+        find: '@ldlework/phosphor/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/styles/index.css'),
+      },
+      {
+        find: '@ldlework/phosphor',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/index.ts'),
+      },
+      {
+        find: '@ldlework/phosphor-dials/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/styles.css'),
+      },
+      {
+        find: '@ldlework/phosphor-dials',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/index.ts'),
+      },
       {
         find: '@ldlework/crt/react',
         replacement: resolve(__dirname, '../../packages/crt/src/react/index.ts'),

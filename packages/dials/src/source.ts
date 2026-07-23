@@ -161,7 +161,7 @@ export function instantiate<P extends Record<string, unknown>, Out>(
     keys.push(k as keyof P & string)
   }
   const body: Body<P, Out> = def.stateful
-    ? (def.body as BodyFactory<P, Out>)()
+    ? guardPerTick((def.body as BodyFactory<P, Out>)())
     : (def.body as Body<P, Out>)
   return {
     kind: 'source',
@@ -171,6 +171,32 @@ export function instantiate<P extends Record<string, unknown>, Out>(
     _buf: buf,
     _keys: keys,
   } as Source<Record<string, unknown>, Out> as Source<P, Out>
+}
+
+/**
+ * Per-tick guard for stateful bodies. A stateful source integrates its
+ * closure state by `dt` inside the body — so it must run exactly once
+ * per time tick, no matter how many slots ride it or how many times a
+ * host samples the tree within one frame. Repeated samples at the same
+ * `ctx.t` return the tick's cached output; the body only advances when
+ * `t` moves. This is what makes the sampler's documented contract —
+ * "sample twice with the same ctx, get the same answer twice" — hold
+ * for stateful sources.
+ */
+function guardPerTick<P extends Record<string, unknown>, Out>(
+  fn: Body<P, Out>,
+): Body<P, Out> {
+  let lastT: number | undefined
+  let lastOut: Out
+  let primed = false
+  return (params, ctx) => {
+    const t = ctx['t']
+    if (typeof t === 'number' && primed && t === lastT) return lastOut
+    lastT = typeof t === 'number' ? t : undefined
+    lastOut = fn(params, ctx)
+    primed = true
+    return lastOut
+  }
 }
 
 // ─── Registry ─────────────────────────────────────────────────────────

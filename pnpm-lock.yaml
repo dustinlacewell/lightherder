@@ -23,6 +23,9 @@ importers:
       '@ldlework/crt':
         specifier: workspace:*
         version: link:../../packages/crt
+      '@ldlework/phosphor':
+        specifier: workspace:*
+        version: link:../../packages/phosphor
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -51,6 +54,12 @@ importers:
       '@ldlework/dials':
         specifier: workspace:*
         version: link:../../packages/dials
+      '@ldlework/phosphor':
+        specifier: workspace:*
+        version: link:../../packages/phosphor
+      '@ldlework/phosphor-dials':
+        specifier: workspace:*
+        version: link:../../packages/phosphor-dials
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -217,6 +226,9 @@ importers:
       '@ldlework/phosphor':
         specifier: workspace:*
         version: link:../../packages/phosphor
+      '@ldlework/phosphor-dials':
+        specifier: workspace:*
+        version: link:../../packages/phosphor-dials
       '@ldlework/scope':
         specifier: workspace:*
         version: link:../../packages/scope
@@ -254,9 +266,18 @@ importers:
       '@ldlework/crt':
         specifier: workspace:*
         version: link:../../packages/crt
+      '@ldlework/dials':
+        specifier: workspace:*
+        version: link:../../packages/dials
       '@ldlework/gl':
         specifier: workspace:*
         version: link:../../packages/gl
+      '@ldlework/phosphor':
+        specifier: workspace:*
+        version: link:../../packages/phosphor
+      '@ldlework/phosphor-dials':
+        specifier: workspace:*
+        version: link:../../packages/phosphor-dials
       '@ldlework/scope':
         specifier: workspace:*
         version: link:../../packages/scope

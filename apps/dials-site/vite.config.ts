@@ -21,6 +21,22 @@ export default defineConfig({
         find: '@ldlework/dials',
         replacement: resolve(__dirname, '../../packages/dials/src/index.ts'),
       },
+      {
+        find: '@ldlework/phosphor/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/styles/index.css'),
+      },
+      {
+        find: '@ldlework/phosphor',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/index.ts'),
+      },
+      {
+        find: '@ldlework/phosphor-dials/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/styles.css'),
+      },
+      {
+        find: '@ldlework/phosphor-dials',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/index.ts'),
+      },
     ],
   },
 })

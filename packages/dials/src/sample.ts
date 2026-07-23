@@ -133,14 +133,22 @@ function glideTowards<T>(slot: Slot<T>, target: T, ctx: Ctx): T {
     return target
   }
   const prev = slot._glideY
+  const t = typeof ctx['t'] === 'number' ? (ctx['t'] as number) : undefined
   if (typeof prev !== 'number' || !Number.isFinite(prev)) {
     slot._glideY = target
+    slot._glideT = t
     return target
+  }
+  // One integration step per tick: repeated samples at the same `ctx.t`
+  // return the already-eased value instead of converging again.
+  if (t !== undefined && t === slot._glideT) {
+    return prev as T
   }
   const dt = typeof ctx['dt'] === 'number' ? (ctx['dt'] as number) : 1 / 60
   const alpha = 1 - Math.exp(-dt / tau)
   const y = prev + (target - prev) * alpha
   slot._glideY = y
+  slot._glideT = t
   return y as T
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { CrtSurface } from '@ldlework/crt/react'
+import { CodeBlock, Display, Tabs } from '@ldlework/phosphor'
 import {
   StampPass,
   PHOSPHOR_P31, PHOSPHOR_P7, PHOSPHOR_P39, PHOSPHOR_BEAUTY,
@@ -156,62 +157,69 @@ export function App() {
   const active = PRESETS[presetIndex]!
 
   return (
-    <>
-      <section className="hero">
-        <p className="hero-name">crt</p>
-        <h1 className="hero-tagline">A phosphor display renderer.</h1>
-        <p className="hero-desc">
-          Renders whatever you draw into it as if it were painted onto a real
-          cathode-ray-tube phosphor: an HDR beam accumulator, Kohlrausch
-          stretched-exponential persistence, separable halation, and an
-          ACES-shoulder tonemap with phosphor-color modulation. crt is
-          content-agnostic — it owns the effect chain, not what gets drawn.
-        </p>
-        <div className="links">
-          <a href="https://www.npmjs.com/package/@ldlework/crt" target="_blank" rel="noreferrer">npm</a>
-          <a href="https://github.com/ldlework/phosphor" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="./storybook/">Storybook</a>
+    <div className="site">
+      <section className="site-section site-hero">
+        <div className="site-container">
+          <p className="site-eyebrow">crt</p>
+          <h1 className="site-h1">A phosphor display renderer.</h1>
+          <p className="site-prose site-hero-desc">
+            Renders whatever you draw into it as if it were painted onto a real
+            cathode-ray-tube phosphor: an HDR beam accumulator, Kohlrausch
+            stretched-exponential persistence, separable halation, and an
+            ACES-shoulder tonemap with phosphor-color modulation. crt is
+            content-agnostic — it owns the effect chain, not what gets drawn.
+          </p>
+          <div className="site-links">
+            <a href="https://www.npmjs.com/package/@ldlework/crt" target="_blank" rel="noreferrer">npm</a>
+            <a href="https://github.com/ldlework/phosphor" target="_blank" rel="noreferrer">GitHub</a>
+            <a href="./storybook/">Storybook</a>
+          </div>
         </div>
       </section>
 
-      <h2>Live demo</h2>
-      <div className="demo-panel">
-        <p className="demo-hint">
-          Move the mouse over the screen — the cursor becomes the phosphor,
-          trailing a soft comet tail (crt's own <code>StampPass</code>). Away
-          from the screen it idles in an orbiting ring. Pick a preset below to
-          change the coating. Preset: <code>{active.name}</code>.
-        </p>
-        <div
-          className="demo-stage"
-          ref={canvasElRef}
-          onPointerMove={onPointerMove}
-          onPointerLeave={onPointerLeave}
-        >
-          <CrtSurface passes={passes} stage={stage} presetFn={presetFn} {...active.preset} />
-        </div>
-      </div>
-
-      <h2>Phosphor presets</h2>
-      <ul className="presets">
-        {PRESETS.map((p, i) => (
-          <li key={p.name}>
-            <button
-              type="button"
-              className="preset-button"
-              data-active={i === presetIndex}
-              onClick={() => setPresetIndex(i)}
+      <section className="site-section" id="demo">
+        <div className="site-container">
+          <h2 className="site-h2">Live demo</h2>
+          <p className="site-prose site-demo-hint">
+            Move the mouse over the screen — the cursor becomes the phosphor,
+            trailing a soft comet tail (crt's own <code>StampPass</code>). Away
+            from the screen it idles in an orbiting ring. Pick a coating with
+            the tabs.
+          </p>
+          <Display fill className="demo-display">
+            <div
+              className="demo-stage"
+              ref={canvasElRef}
+              onPointerMove={onPointerMove}
+              onPointerLeave={onPointerLeave}
             >
-              <span className="preset-name">{p.name}</span>
-              <span className="preset-char">{p.char}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+              <CrtSurface passes={passes} stage={stage} presetFn={presetFn} {...active.preset} />
+            </div>
+          </Display>
+          <div className="demo-presets">
+            <Tabs
+              tabs={PRESETS.map((p, i) => ({ key: String(i), label: p.name.replace('PHOSPHOR_', '') }))}
+              active={String(presetIndex)}
+              onSelect={(k) => setPresetIndex(Number(k))}
+            />
+            <p className="site-prose demo-preset-char">
+              <code>{active.name}</code> — {active.char}
+            </p>
+          </div>
+        </div>
+      </section>
 
-      <h2>Install</h2>
-      <pre><code>pnpm add @ldlework/crt</code></pre>
-      <pre><code>{`import { useCallback, useRef } from 'react'
+      <section className="site-section" id="install">
+        <div className="site-container site-container--narrow">
+          <h2 className="site-h2">Install</h2>
+          <CodeBlock lang="bash" code="pnpm add @ldlework/crt" />
+          <p className="site-prose site-install-prose">
+            Bring your own passes — crt owns the effect chain, you own the
+            deposits:
+          </p>
+          <CodeBlock
+            lang="tsx"
+            code={`import { useCallback, useRef } from 'react'
 import { CrtSurface } from '@ldlework/crt/react'
 import {
   StampPass, PHOSPHOR_P31,
@@ -232,9 +240,19 @@ function Scanner() {
   }, [])
 
   return <CrtSurface passes={passes} stage={stage} {...PHOSPHOR_P31} />
-}`}</code></pre>
+}`}
+          />
+        </div>
+      </section>
 
-      <footer>crt · MIT · @ldlework</footer>
-    </>
+      <footer className="site-footer">
+        <div className="site-footer-links">
+          <a href="https://github.com/ldlework/phosphor" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="./storybook/">Storybook</a>
+          <a href="https://www.npmjs.com/package/@ldlework/crt" target="_blank" rel="noreferrer">npm</a>
+        </div>
+        <div>crt · MIT · @ldlework</div>
+      </footer>
+    </div>
   )
 }

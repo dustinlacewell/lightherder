@@ -268,6 +268,12 @@ export interface Slot<T> {
    * target so smoothing eases from where the signal is, not from zero.
    */
   _glideY?: number
+  /**
+   * Time of the last glide integration step. The one-pole advances
+   * once per tick — repeated samples at the same `ctx.t` return the
+   * already-integrated value instead of converging again.
+   */
+  _glideT?: number
 }
 
 /** The type a slot resolves to. */

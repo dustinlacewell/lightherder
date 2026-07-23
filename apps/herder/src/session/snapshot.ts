@@ -216,7 +216,8 @@ export async function restorePeerBench(l: Live, swapped: boolean): Promise<void>
      peer's pictures, which are now safely back on disk. */
   const patch = loadPatch() ?? { nodes: [], edges: [], globals: cloneTree(mirror.globals) };
   mirror.globals = patch.globals;
-  engineRef.current?.setResolution((patch.globals.res as Slot<number>).dial.value);
+  const resSlot = patch.globals.res as Slot<number> | undefined;
+  if (resSlot) engineRef.current?.setResolution(resSlot.dial.value);
   l.deps.rebuild({ nodes: patch.nodes, edges: patch.edges });
 
   dropStash();

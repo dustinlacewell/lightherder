@@ -34,6 +34,25 @@ export default defineConfig({
         find: '@ldlework/phosphor',
         replacement: resolve(__dirname, '../../packages/phosphor/src/index.ts'),
       },
+      // The dial-tree UI graph (dials/react + phosphor-dials) resolves
+      // to source as one unit so the tuning panel and the phosphor-dials
+      // internals share the same modules during dev.
+      {
+        find: '@ldlework/dials/react',
+        replacement: resolve(__dirname, '../../packages/dials/src/react/index.ts'),
+      },
+      {
+        find: '@ldlework/dials',
+        replacement: resolve(__dirname, '../../packages/dials/src/index.ts'),
+      },
+      {
+        find: '@ldlework/phosphor-dials/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/styles.css'),
+      },
+      {
+        find: '@ldlework/phosphor-dials',
+        replacement: resolve(__dirname, '../../packages/phosphor-dials/src/index.ts'),
+      },
     ],
   },
 })

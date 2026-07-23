@@ -455,6 +455,16 @@ describe('glide smoothing', () => {
     expect(first).toBeGreaterThan(0)
     expect(first).toBeLessThan(1) // did NOT snap to the full swing
   })
+
+  it('integrates once per tick — same t returns the same eased value', () => {
+    const s = dial(0)
+    setGlide(s, 1)
+    sampleSlot(s, { t: 0, dt: 1 }) // seed at 0
+    s.dial.value = 10
+    const a = sampleSlot(s, { t: 1, dt: 1 }) as number
+    expect(sampleSlot(s, { t: 1, dt: 1 })).toBe(a) // no double-converge
+    expect(sampleSlot(s, { t: 2, dt: 1 })).toBeGreaterThan(a)
+  })
 })
 
 describe('lastSample stash', () => {

@@ -28,9 +28,20 @@
   border-bottom: 1px solid var(--chrome-divider, rgba(255, 255, 255, 0.08));
 }
 
+/*
+ * align-items: flex-start (not the flex default `stretch`) is load-
+ * bearing: without it, `.pd-row-caption`/`.pd-row-control` stretch to
+ * match the WIDEST child in this column — which is `.pd-row-nested`
+ * once a modulation drawer opens (it contains a whole sub-panel, wider
+ * than the knob). Centering then happens over that wider box, so the
+ * knob visibly drifts right as the drawer opens. Left-anchoring the
+ * row keeps the knob's own column narrow and flush left regardless of
+ * how wide the (separately-scrolling) drawer below it grows.
+ */
 .pd-row {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 3px;
   padding: 2px 0;
 }
@@ -133,6 +144,7 @@
 .pd-row-attach-bare {
   position: static;
   justify-content: flex-end;
+  align-self: stretch;
 }
 
 /*

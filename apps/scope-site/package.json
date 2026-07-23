@@ -13,6 +13,9 @@
     "@ldlework/scope": "workspace:*",
     "@ldlework/crt": "workspace:*",
     "@ldlework/gl": "workspace:*",
+    "@ldlework/dials": "workspace:*",
+    "@ldlework/phosphor": "workspace:*",
+    "@ldlework/phosphor-dials": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

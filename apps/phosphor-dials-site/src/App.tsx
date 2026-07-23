@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { dial, read, attachFrom, setDepth, sine } from '@ldlework/dials'
 import { Panel as DialsPanel } from '@ldlework/dials/react'
 import { CodeBlock, Panel as ChromePanel } from '@ldlework/phosphor'
@@ -37,15 +37,20 @@ import { dialPanelComponents } from '@ldlework/phosphor-dials'
 <Panel dials={mySurface} components={dialPanelComponents} />`
 
 export function App() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
   // Host-app sampling loop: read() every frame keeps each slot's
   // lastSample fresh so an attached source's modulated value shows on
-  // the knob without the Panel needing to know anything changed.
+  // the knob without the Panel needing to know anything changed. The
+  // same sampled values drive the sine trace drawn below the panel.
   useEffect(() => {
     let last = performance.now()
     let raf = requestAnimationFrame(function tick(now: number) {
+      const t = now / 1000
       const dt = (now - last) / 1000
       last = now
-      read(synthDials, { t: now / 1000, dt })
+      const { freq, amp, detune } = read(synthDials, { t, dt })
+      drawSineTrace(canvasRef.current, t, freq, amp, detune)
       raf = requestAnimationFrame(tick)
     })
     return () => cancelAnimationFrame(raf)
@@ -54,11 +59,56 @@ export function App() {
   return (
     <div className="site">
       <Hero />
-      <DemoSection />
+      <DemoSection canvasRef={canvasRef} />
       <InstallSection />
       <Footer />
     </div>
   )
+}
+
+/**
+ * Draw one screenful of `amp · sin(2π·freq·t + detuneRad)` into the
+ * canvas, scrolling in real time. `freq`/`amp`/`detune` are this frame's
+ * live sampled dial values (post-modulation) — dragging a knob or
+ * letting the attached sine ride `freq` both show up here immediately.
+ * `detune` is in cents; converted to a phase offset in radians so a
+ * twist is visible as a shifting waveform, not just a number.
+ */
+function drawSineTrace(
+  canvas: HTMLCanvasElement | null,
+  t: number,
+  freq: number,
+  amp: number,
+  detuneCents: number,
+): void {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = window.devicePixelRatio || 1
+  const cssW = canvas.clientWidth
+  const cssH = canvas.clientHeight
+  if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
+    canvas.width = cssW * dpr
+    canvas.height = cssH * dpr
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, cssW, cssH)
+
+  const phase = (detuneCents / 1200) * 2 * Math.PI // cents -> radians offset
+  const windowSec = 0.02 // one trace window, seconds of signal shown
+  const midY = cssH / 2
+
+  ctx.beginPath()
+  for (let px = 0; px <= cssW; px++) {
+    const sampleT = t - windowSec * (1 - px / cssW)
+    const y = midY - amp * Math.sin(2 * Math.PI * freq * sampleT + phase) * (midY - 6)
+    if (px === 0) ctx.moveTo(px, y)
+    else ctx.lineTo(px, y)
+  }
+  const accent = getComputedStyle(canvas).getPropertyValue('--theme-lit-bright').trim()
+  ctx.strokeStyle = accent || '#7ee0c0'
+  ctx.lineWidth = 2
+  ctx.stroke()
 }
 
 function Hero() {
@@ -88,23 +138,29 @@ function Hero() {
   )
 }
 
-function DemoSection() {
+function DemoSection({
+  canvasRef,
+}: {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>
+}) {
   return (
     <section className="site-section" id="demo">
       <div className="site-container site-container--narrow">
         <h2 className="site-h2">Live demo</h2>
         <p className="site-prose site-demo-hint">
           A dials <code>Panel</code> rendered through{' '}
-          <code>dialPanelComponents</code>, mounted on a phosphor chassis.
-          <code>freq</code> starts modulated by a slow <code>sine</code> —
-          watch the knob ride it. Open the "↻" picker in any knob's face to
-          attach a different source (lfo, noise…); the row expands into a
-          nested sub-panel of the source's own dials, recursively.
+          <code>dialPanelComponents</code>, mounted on a phosphor chassis. The
+          trace below is a real sine wave — <code>amp · sin(2π · freq · t + detune)</code> —
+          drawn from these dials' live sampled values every frame.{' '}
+          <code>freq</code> starts modulated by a slow <code>sine</code> source
+          too, so it sweeps on its own; drag any knob or open the "↻" picker
+          to attach a different source and watch the trace respond.
         </p>
         <ChromePanel style={{ padding: 24 }}>
           <div className="pd-demo-horizontal">
             <DialsPanel title="Synth" dials={synthDials} components={dialPanelComponents} />
           </div>
+          <canvas ref={canvasRef} className="pd-demo-trace" />
         </ChromePanel>
       </div>
     </section>

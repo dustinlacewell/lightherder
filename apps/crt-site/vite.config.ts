@@ -22,6 +22,14 @@ export default defineConfig({
         find: '@ldlework/crt',
         replacement: resolve(__dirname, '../../packages/crt/src/index.ts'),
       },
+      {
+        find: '@ldlework/phosphor/styles.css',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/styles/index.css'),
+      },
+      {
+        find: '@ldlework/phosphor',
+        replacement: resolve(__dirname, '../../packages/phosphor/src/index.ts'),
+      },
     ],
   },
 })
