@@ -8,7 +8,7 @@ import type { Slot } from '@ldlework/dials';
 import { SlotRow, PanelComponentsProvider } from '@ldlework/dials/react';
 import { useStore } from '@xyflow/react';
 import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, paramHints, polarityOf, rideValue, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI, type NodeKind, type ParamDef } from '../../patch';
-import { dispatch, holdSwitch, mirror, releaseSwitch, watchTick } from '../../runtime';
+import { dispatch, drivenPorts, holdSwitch, releaseSwitch, watchTick } from '../../runtime';
 import { FX } from '../../fx';
 import { ArcGauge, XYPad } from '../controls/Knob';
 import { SlotNodeProvider, dialFaceComponents, liveOverrideFor, useNodeWriteRepaint } from '../controls/dialsBundle';
@@ -162,35 +162,15 @@ export function SwitchNode({ id, data }: DeviceProps) {
   );
 }
 
-/* the params a dial (or one axis of an XY pad) drives: ride its wire
-   forward — through module-boundary IN/OUT devices — to the terminal
-   param ports, in the COMPILED graph (view ids are compiled ids, so
-   wires landing inside modules count). Only wires off the given output
-   handle are followed, so an XY pad's two axes are judged
-   independently. The destination set shapes the dial's face: all-
-   unipolar flips the knob to 0…+1 (rest at the floor, whole throw
-   pushes up), and a SINGLE destination lends the face its units. */
+/* the params a dial (or one axis of an XY pad) drives — the proxy's
+   own forward walk (runtime drivenPorts), mapped to their ParamDefs.
+   The destination set shapes the dial's face: all-unipolar flips the
+   knob to 0…+1 (rest at the floor, whole throw pushes up), and a
+   SINGLE destination lends the face its units. */
 function dialDestinations(id: string, sourceHandle: string): ParamDef[] {
-  const byId = new Map(mirror.nodes.map(n => [n.id, n]));
-  const seen = new Set<string>([`${id}|${sourceHandle}`]);
-  const stack = [{ from: id, handle: sourceHandle }];
-  const defs: ParamDef[] = [];
-  while (stack.length) {
-    const cur = stack.pop()!;
-    for (const e of mirror.edges) {
-      if (e.source !== cur.from || e.sourceHandle !== cur.handle || !e.targetHandle?.startsWith('c:')) continue;
-      const tgt = byId.get(e.target);
-      if (!tgt) continue;
-      if (tgt.type === 'in' || tgt.type === 'out') {
-        const key = `${tgt.id}|c:out`;
-        if (!seen.has(key)) { seen.add(key); stack.push({ from: tgt.id, handle: 'c:out' }); }
-        continue;
-      }
-      const def = PARAMS[tgt.type]?.[e.targetHandle.slice(2)];
-      if (def) defs.push(def);
-    }
-  }
-  return defs;
+  return drivenPorts(id, sourceHandle)
+    .map(p => PARAMS[p.node.type]?.[p.key])
+    .filter((d): d is ParamDef => !!d);
 }
 
 /** all-unipolar destinations flip the throw; a bipolar port, or an

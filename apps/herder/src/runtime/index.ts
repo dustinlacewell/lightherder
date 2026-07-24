@@ -17,7 +17,7 @@ export { transport, setFrozen, stepOnce, clearAllScreens } from './transport';
 export { spark, tap, sparkAll, sampleSpark, holdSwitch, releaseSwitch, heldInput, dropGesturesUnder, drawStroke, drawCommit, drawClear, type Spark } from './gestures';
 export { emitEph, watchEph, muted, type Eph } from './ephemera';
 export { liveValue, liveDriver, setLive, clearLive, flushLive, watchLive, notifyNodeWrite, watchNodeWrites, notifyTick, watchTick } from './live';
-export { dispatchParam } from './proxy';
+export { dispatchParam, seedConnect, drivenPorts, type DrivenPort } from './proxy';
 export { stage, setFace, addShield, dropFacesUnder, type PopoutSink } from './stage';
 export { engineRef, type EngineApi, type DrawSurface } from './engineRef';
 export { releaseNode, parkNode } from './release';

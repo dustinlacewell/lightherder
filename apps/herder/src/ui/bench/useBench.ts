@@ -12,7 +12,7 @@ import {
   slotsFor, sweepEntryVals, treeToSnap, unproject, validConnection, viewContext, type Crumb, type InstVals, type SubPatch, type ViewCtx,
 } from '../../patch';
 import { libStore } from '../../persist';
-import { consumeEcho, dispatch, mirror, parkNode, record, registerApplier, releaseNode } from '../../runtime';
+import { consumeEcho, dispatch, mirror, parkNode, record, registerApplier, releaseNode, seedConnect } from '../../runtime';
 import { announcePresence } from '../../session';
 import * as midi from '../../midi';
 import { bootRoot, bootView } from './boot';
@@ -423,10 +423,12 @@ export function useBench(): Bench {
      level) */
   const onConnect = useCallback((c: Connection) => {
     if (!c.sourceHandle || !c.targetHandle || !validConnection(c.sourceHandle, c.targetHandle)) return;
-    dispatch({
-      kind: 'connect', scope: { kind: 'doc', path: [] },
-      edge: makeEdge(c.source, c.sourceHandle, c.target, c.targetHandle),
-    });
+    const edge = makeEdge(c.source, c.sourceHandle, c.target, c.targetHandle);
+    dispatch({ kind: 'connect', scope: { kind: 'doc', path: [] }, edge });
+    /* a control wire from a dial makes the dial that param's proxy —
+       seed the two faces into agreement (the dial adopts its first
+       destination's value; a macro dial pushes its base instead) */
+    seedConnect(edge);
   }, []);
 
   const isValid: IsValidConnection<BenchEdge> = useCallback(
