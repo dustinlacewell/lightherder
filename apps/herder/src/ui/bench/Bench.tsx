@@ -178,6 +178,10 @@ export function Bench() {
          capture still bubbles through it) — and the rAF coalescer in
          announcePresence keeps it to one message a frame. Quarter-unit
          rounding trims the JSON without a visible step even at max zoom. */
+      /* the browser context menu never opens anywhere on the bench —
+         right-click is app vocabulary (knob chords, slot menus). Inner
+         handlers still see the event first as it bubbles up to here. */
+      onContextMenu={e => e.preventDefault()}
       onPointerMove={e => announcePresence({ cur: flowAt(e.clientX, e.clientY) })}
       onPointerLeave={() => announcePresence({ cur: null })}
       /* middle click pings the bench — a "look here" any role may make.
