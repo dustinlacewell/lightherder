@@ -230,6 +230,44 @@ export function paramHints(def: ParamDef): ParamHints {
   };
 }
 
+/* ---- the wire ride mapping — dial signal ↔ param value ----------------
+   A control wire DRIVES its param: the dial's signal maps onto the
+   knob's full range absolutely — the param's own base is bypassed while
+   a wire rides, because the dial IS the param (two-way: editing the
+   ridden knob inverse-maps back onto the dial). Unipolar params read
+   the signal 0…+1 up from the floor; bipolar params read ±1 around the
+   center. Ratio (log-scale) params map in log space, so a full throw
+   is min↔max either way. */
+
+/** the param value a dial signal drives — the forward map the engine's
+    wire combine applies */
+export function rideValue(min: number, max: number, hints: ParamHints | undefined, c: number): number {
+  if (hints?.scale === 'log') {
+    const lo = Math.max(min, 1e-6);
+    const span = Math.log(max / lo);
+    return hints.polarity === 'uni'
+      ? lo * Math.exp(c * span)
+      : Math.sqrt(lo * max) * Math.exp(c * span / 2);
+  }
+  return hints?.polarity === 'uni'
+    ? min + c * (max - min)
+    : (min + max) / 2 + c * ((max - min) / 2);
+}
+
+/** the dial signal that lands a param on `v` — rideValue's exact
+    inverse; the write-back path speaks it when an edit on a ridden knob
+    belongs to the driving dial */
+export function rideSignal(min: number, max: number, hints: ParamHints | undefined, v: number): number {
+  let t: number;
+  if (hints?.scale === 'log') {
+    const lo = Math.max(min, 1e-6);
+    t = Math.log(Math.max(v, 1e-6) / lo) / Math.log(max / lo);
+  } else {
+    t = (v - min) / (max - min);
+  }
+  return hints?.polarity === 'uni' ? t : t * 2 - 1;
+}
+
 /** build a fresh Slot for one param — the value store the tree carries.
     min/max/def/step/desc map onto DialMeta; the engine-only bits ride in
     `meta.hints`. `initial` is the def, so reset-to-home works for free. */

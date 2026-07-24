@@ -55,13 +55,17 @@ export class Wiring {
     return null;
   }
 
-  /* what a control input reads. Control ports fan in: walk every wire
-     on the port, riding through module-boundary IN/OUT devices (which
-     fan in themselves), and give the port to the dial whose knob moved
-     most recently — ties go to the newest wire. Rest (0) if nothing
-     lands. */
-  ctlIn(target: string, handle: string, dials: StampBank): number {
-    let bestVal = 0, bestStamp = -1, bestOrder = -1;
+  /* what a control input reads — and WHO. Control ports fan in: walk
+     every wire on the port, riding through module-boundary IN/OUT
+     devices (which fan in themselves), and give the port to the dial
+     whose knob moved most recently — ties go to the newest wire. Null
+     if nothing lands (distinct from a winning dial resting at 0: a
+     riding dial DRIVES the param, so its rest position is a value, not
+     an absence). The winner's identity rides along so paramValue can
+     publish who owns the port — the write-back path's addressee. */
+  ctlIn(target: string, handle: string, dials: StampBank): CtlRide | null {
+    let best: CtlRide | null = null;
+    let bestStamp = -1, bestOrder = -1;
     const visited = new Set<string>();
     const stack: { key: string; depth: number }[] = [{ key: `${target}|${handle}`, depth: 0 }];
     while (stack.length) {
@@ -85,11 +89,15 @@ export class Wiring {
           if (stamp > bestStamp || (stamp === bestStamp && order > bestOrder)) {
             bestStamp = stamp;
             bestOrder = order;
-            bestVal = dials.signalOf(src, axis);
+            best = { v: dials.signalOf(src, axis), src, axis };
           }
         }
       }
     }
-    return bestVal;
+    return best;
   }
 }
+
+/** a control wire's resolved landing: the winning dial's signal, and
+    the dial itself (node + axis) — the port's owner this tick */
+export interface CtlRide { v: number; src: PatchNode; axis: string }

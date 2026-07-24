@@ -7,7 +7,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Slot } from '@ldlework/dials';
 import { SlotRow, PanelComponentsProvider } from '@ldlework/dials/react';
 import { useStore } from '@xyflow/react';
-import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, polarityOf, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI, type NodeKind } from '../../patch';
+import { DIAL_VAL_UNI, MIXER_MODES, PARAMS, paramHints, polarityOf, rideValue, SWITCH_INS, XYPAD_X_UNI, XYPAD_Y_UNI, type NodeKind, type ParamDef } from '../../patch';
 import { dispatch, holdSwitch, mirror, releaseSwitch, watchTick } from '../../runtime';
 import { FX } from '../../fx';
 import { ArcGauge, XYPad } from '../controls/Knob';
@@ -162,19 +162,19 @@ export function SwitchNode({ id, data }: DeviceProps) {
   );
 }
 
-/* which way a dial (or one axis of an XY pad) should throw: ride its
-   wire forward — through module-boundary IN/OUT devices — to the
-   terminal param ports, in the COMPILED graph (view ids are compiled
-   ids, so wires landing inside modules count). All-unipolar
-   destinations flip the knob to 0…+1 (rest at the floor, whole throw
-   pushes up); any bipolar port, or an idle wire, keeps ±1. Only wires
-   off the given output handle are followed, so an XY pad's two axes
-   are judged independently. */
-function dialPolarity(id: string, sourceHandle: string): 'uni' | 'bi' {
+/* the params a dial (or one axis of an XY pad) drives: ride its wire
+   forward — through module-boundary IN/OUT devices — to the terminal
+   param ports, in the COMPILED graph (view ids are compiled ids, so
+   wires landing inside modules count). Only wires off the given output
+   handle are followed, so an XY pad's two axes are judged
+   independently. The destination set shapes the dial's face: all-
+   unipolar flips the knob to 0…+1 (rest at the floor, whole throw
+   pushes up), and a SINGLE destination lends the face its units. */
+function dialDestinations(id: string, sourceHandle: string): ParamDef[] {
   const byId = new Map(mirror.nodes.map(n => [n.id, n]));
   const seen = new Set<string>([`${id}|${sourceHandle}`]);
   const stack = [{ from: id, handle: sourceHandle }];
-  let uni = false;
+  const defs: ParamDef[] = [];
   while (stack.length) {
     const cur = stack.pop()!;
     for (const e of mirror.edges) {
@@ -187,13 +187,16 @@ function dialPolarity(id: string, sourceHandle: string): 'uni' | 'bi' {
         continue;
       }
       const def = PARAMS[tgt.type]?.[e.targetHandle.slice(2)];
-      if (!def) continue;
-      if (polarityOf(def) === 'bi') return 'bi';
-      uni = true;
+      if (def) defs.push(def);
     }
   }
-  return uni ? 'uni' : 'bi';
+  return defs;
 }
+
+/** all-unipolar destinations flip the throw; a bipolar port, or an
+    idle wire, keeps ±1 */
+const allUni = (defs: ParamDef[]): boolean =>
+  defs.length > 0 && defs.every(d => polarityOf(d) === 'uni');
 
 /* how deep the val's VISIBLE modulation nests: 0 = bare knob (or the
    sub-panel folded away — slot.folded is the SlotRow's fold state,
@@ -234,8 +237,14 @@ export function DialNode({ id, data }: DeviceProps) {
   useNodeWriteRepaint(id, repaint);
   /* view edges are only the invalidation signal — the walk reads the mirror */
   const edges = useStore(s => s.edges);
-  const uni = useMemo(() => dialPolarity(id, 'c:out') === 'uni', [id, edges]);
-  /* polarity re-range lives on the slot's META — the knob face, the MIDI
+  const dests = useMemo(() => dialDestinations(id, 'c:out'), [id, edges]);
+  const uni = allUni(dests);
+  /* the one param this dial drives, when it drives exactly one — the
+     knob face reads out in ITS units (the proxy made visible: the
+     number under the knob is the destination's value). A fan-out dial
+     keeps the normalized face — it's a macro knob. */
+  const solo = dests.length === 1 ? dests[0] : null;
+  /* face re-tune lives on the slot's META — the knob face, the MIDI
      CC mapping and the modulation depth scaling all read min/max there,
      so one write retunes all three. Display-plus-travel only: the engine's
      wire combine keys off the TARGET port's polarity, not this. NB: a
@@ -245,11 +254,18 @@ export function DialNode({ id, data }: DeviceProps) {
      has nowhere to live on a unipolar knob, so it clamps to the floor. */
   useEffect(() => {
     const d = uni ? DIAL_VAL_UNI : PARAMS.dial.val;
-    if (val.dial.meta.min !== d.min) {
-      val.dial.meta.min = d.min;
-      val.dial.meta.description = d.desc;
-      repaint();
-    }
+    const meta = val.dial.meta;
+    const hints = solo ? paramHints(solo) : null;
+    meta.min = d.min;
+    meta.format = solo && hints
+      ? (c: number) => solo.fmt(rideValue(solo.min, solo.max, hints, c))
+      : d.fmt;
+    meta.description = solo
+      ? `${d.desc} Driving ${solo.label} — the readout shows the destination's value.`
+      : d.desc;
+    repaint();
+  }, [uni, solo, val]);
+  useEffect(() => {
     if (uni && val.dial.value < 0) setParam('val', 0);
   }, [uni, val, val.dial.value]);
   /* widen the node by the val's VISIBLE modulation depth so the expanded
@@ -279,8 +295,8 @@ export function XyPadNode({ id, data }: DeviceProps) {
   const setParam = useSetParam(id);
   const live = useMemo(() => liveOverrideFor(id), [id]);
   const edges = useStore(s => s.edges);
-  const uniX = useMemo(() => dialPolarity(id, 'c:x') === 'uni', [id, edges]);
-  const uniY = useMemo(() => dialPolarity(id, 'c:y') === 'uni', [id, edges]);
+  const uniX = useMemo(() => allUni(dialDestinations(id, 'c:x')), [id, edges]);
+  const uniY = useMemo(() => allUni(dialDestinations(id, 'c:y')), [id, edges]);
   useEffect(() => {
     if (uniX && (data.slots.x as Slot<number>).dial.value < 0) setParam('x', 0);
   }, [uniX, (data.slots.x as Slot<number>).dial.value]);

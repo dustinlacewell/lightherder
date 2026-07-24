@@ -12,7 +12,7 @@
    always mounted. */
 
 import { GLOBAL_PARAMS, resolveSlot } from '../patch';
-import { dispatch, mirror } from '../runtime';
+import { dispatchParam, mirror } from '../runtime';
 import type { Slot } from '@ldlework/dials';
 import type { Listener, Target } from './types';
 
@@ -99,8 +99,10 @@ function modelTarget(target: string): Target | null {
   const slot = n ? (resolveSlot(n.data.slots, param) as Slot<number> | null) : null;
   if (!n || !slot) return null;
   const r = slotRange(slot);
+  /* routed through the wire proxy: a CC on a ridden param belongs to
+     the driving dial, exactly as the mounted knob's setter would land */
   const write = (v: number): void => {
-    dispatch({ kind: 'setParam', scope: { kind: 'doc', path: [] }, node: scope, key: param, v: clampStep(r, v) }, { silent: true });
+    dispatchParam(scope, param, slot, clampStep(r, v), { silent: true });
   };
   const current = (): number => slot.lastSample ?? slot.dial.value;
   return {

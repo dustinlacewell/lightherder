@@ -12,14 +12,30 @@
 const liveValues = new Map<string, number>();
 const liveWatchers = new Map<string, Set<() => void>>();
 const liveDirty = new Set<string>();
+/* alongside each ridden value, WHO drives it — the winning dial
+   (ctlIn's last-moved tiebreak), "nodeId:param" → { id, axis }. The
+   write-back path reads it synchronously at edit time: a set on a
+   ridden knob belongs to this dial, not the param's bypassed base. No
+   watchers — engine-written once per tick, read on demand. */
+const liveDrivers = new Map<string, { id: string; axis: string }>();
 
 /** the ridden value for a target, if a wire is riding it right now */
 export function liveValue(target: string): number | undefined {
   return liveValues.get(target);
 }
 
-/** engine only: record a ridden param's effective value this tick */
-export function setLive(target: string, v: number): void {
+/** the dial driving a ridden target right now — the addressee for an
+    edit on its knob */
+export function liveDriver(target: string): { id: string; axis: string } | undefined {
+  return liveDrivers.get(target);
+}
+
+/** engine only: record a ridden param's effective value this tick, and
+    the dial that drove it. The driver updates even when the value holds
+    still — the winner can change between two dials resting on the same
+    signal. */
+export function setLive(target: string, v: number, driver?: { id: string; axis: string }): void {
+  if (driver) liveDrivers.set(target, driver);
   if (liveValues.get(target) === v) return;
   liveValues.set(target, v);
   liveDirty.add(target);
@@ -28,6 +44,7 @@ export function setLive(target: string, v: number): void {
 /** engine only: nothing rides this param anymore — the knob's base is
     the truth again */
 export function clearLive(target: string): void {
+  liveDrivers.delete(target);
   if (liveValues.delete(target)) liveDirty.add(target);
 }
 

@@ -29,7 +29,7 @@ import {
 } from '@ldlework/dials/react';
 import { makeDialPanelComponents } from '@ldlework/phosphor-dials';
 import { libHead, resolveSlot } from '../../patch';
-import { dispatch, liveValue, mirror, watchNodeWrites } from '../../runtime';
+import { dispatch, dispatchParam, liveValue, mirror, watchNodeWrites } from '../../runtime';
 import { SlotChrome } from './SlotChrome';
 
 /* the level-local op target: the shell holds the compiled view id, and
@@ -96,8 +96,11 @@ export function useSlotNode(): SlotNode | null {
 function herderActions(id: string): Partial<SlotActions> {
   const opts = { silent: libHead(id.split('/')[0]) === null };
   return {
-    setValue: (path, _slot, v) =>
-      dispatch({ kind: 'setParam', scope: at(), node: id, key: keyOf(path), v: v as number }, opts),
+    /* routed through the wire proxy: while a dial drives this param the
+       edit belongs to the dial (the engine bypasses the base cell) —
+       dispatchParam inverse-maps and lands it there */
+    setValue: (path, slot, v) =>
+      dispatchParam(id, keyOf(path), slot, v as number, opts),
     attach: (path, _slot, source) =>
       dispatch({ kind: 'slotAttach', scope: at(), node: id, key: keyOf(path), source }, opts),
     setDepth: (path, _slot, depth) =>

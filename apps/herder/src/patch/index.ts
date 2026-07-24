@@ -4,7 +4,7 @@
 
 export {
   polarityOf, defaultValues, defaultGlobals,
-  slotFor, slotsFor, globalSlots, paramHints,
+  slotFor, slotsFor, globalSlots, paramHints, rideValue, rideSignal,
   PARAMS, DRAWER, GLOBAL_PARAMS, DIAL_VAL_UNI, XYPAD_X_UNI, XYPAD_Y_UNI, MIXER_MODES, DELAY_MAX, RES_STEPS, RES_LABELS,
   type ParamDef, type ParamHints,
 } from './params';
