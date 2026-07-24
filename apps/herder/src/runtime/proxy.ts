@@ -26,7 +26,7 @@ import type { Slot } from '@ldlework/dials';
 import { rideSignal, rideValue, type ParamHints, type PatchEdge, type PatchNode } from '../patch';
 import { dispatch, type DispatchOpts } from './dispatch';
 import { heldInput } from './gestures';
-import { liveDriver } from './live';
+import { liveDriver, liveValue, setLive } from './live';
 import { mirror } from './mirror';
 
 const DOC = { kind: 'doc' as const, path: [] as string[] };
@@ -114,18 +114,29 @@ export function seedConnect(edge: PatchEdge): void {
 
 /* land a dial-axis value, then propagate its mapped base onto every
    param the dial drives — the proxy sync, fired exactly when the dial
-   changes */
+   changes. An INSTANT dial (no glide, no attached modulation) resolves
+   to exactly this value on the engine's next tick, so the live channel
+   is updated synchronously too — the base pointer and the ride mark
+   move in the same frame instead of fighting for one. A glided or
+   modulated dial keeps the engine's animated publish (the mark is
+   genuinely elsewhere, easing). */
 function dispatchDial(id: string, axis: string, c: number, opts: DispatchOpts): void {
   dispatch({ kind: 'setParam', scope: DOC, node: id, key: axis, v: c }, opts);
-  propagate(drivenPorts(id, AXIS_HANDLE[axis]), c, opts);
+  const s = mirror.nodes.find(n => n.id === id)?.data.slots[axis] as Slot<number> | undefined;
+  const instant = !!s && !s.attached && !((s.glide ?? 0) > 0);
+  propagate(drivenPorts(id, AXIS_HANDLE[axis]), c, opts, instant ? { id, axis } : undefined);
 }
 
-function propagate(dests: DrivenPort[], c: number, opts: DispatchOpts): void {
+function propagate(dests: DrivenPort[], c: number, opts: DispatchOpts, driver?: { id: string; axis: string }): void {
   for (const { node, key } of dests) {
     const meta = metaOf(node, key);
     if (!meta) continue;
     const v = rideValue(meta.min ?? 0, meta.max ?? 1, meta.hints as ParamHints | undefined, c);
     dispatch({ kind: 'setParam', scope: DOC, node: node.id, key, v }, opts);
+    /* already-riding ports only: presence is the ride signal, so this
+       never STARTS a ride — the engine owns that on its next tick */
+    const target = `${node.id}:${key}`;
+    if (driver && liveValue(target) !== undefined) setLive(target, v, driver);
   }
 }
 
