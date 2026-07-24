@@ -9,7 +9,8 @@
    exchanged until the op stream and join snapshot land (S3/S4). */
 
 import type { DialsSnap } from '@ldlework/dials';
-import type { NodeKind, Op } from '../patch';
+import type { NodeKind } from '../patch';
+import type { WireOp } from './wireOps';
 
 /** the protocol version, stamped in `hello` so a future dialect can be
     told from this one before a handshake commits to it */
@@ -50,10 +51,12 @@ export interface PeerInfo { id: string; write: boolean }
 
 /* ---- op / req: the document stream (JSON) ------------------------------ */
 
-/** host→all: one sequenced op, tagged with its origin and blob deps */
-export interface OpMsg { q: number; f: string; cs?: number; op: Op; b?: string[] }
+/** host→all: one sequenced op, tagged with its origin and blob deps.
+    `op` is wire-encoded (wireOps.ts) — structural payloads travel as
+    patch-JSON, never live slot trees. */
+export interface OpMsg { q: number; f: string; cs?: number; op: WireOp; b?: string[] }
 /** a writing peer→host: a request to apply an op (canonical ops only) */
-export interface ReqMsg { cs: number; op: Op; b?: string[] }
+export interface ReqMsg { cs: number; op: WireOp; b?: string[] }
 
 /* ---- snap: the join snapshot (JSON, targeted) -------------------------- */
 

@@ -31,6 +31,7 @@ import { storeMedia } from '../persist';
 import { sessionStore } from './store';
 import { getLive, type Live } from './live';
 import { sendSnapshot } from './snapshot';
+import { opFromWire, opToWire } from './wireOps';
 import type { HeldBlob } from './snapshot';
 import type { PeerInfo, ReqMsg } from './protocol';
 
@@ -91,7 +92,10 @@ function installOpBroadcast(l: Live): void {
     const f = l.pendingFrom ?? selfId;
     const cs = l.pendingCs ?? undefined;
     const b = l.pendingBlobs && l.pendingBlobs.length ? l.pendingBlobs : undefined;
-    void l.room.actions.op.send(cs !== undefined ? { q, f, cs, op, b } : { q, f, op, b });
+    /* wire-encode: a structural op's live slot trees would lose their
+       source bodies to JSON serialization (wireOps.ts) */
+    const w = opToWire(op);
+    void l.room.actions.op.send(cs !== undefined ? { q, f, cs, op: w, b } : { q, f, op: w, b });
   });
   l.teardown.push(off);
 }
@@ -156,11 +160,18 @@ function installReqService(l: Live): void {
      reads these to tag `f`/`cs`/`b`. Cleared straight after so the host's
      own next edit tags itself. */
   const service = (from: string, msg: ReqMsg): void => {
+    /* decode the wire form back to a live op; a payload that doesn't
+       rebuild (skew, hostile) is refused like any invalid request */
+    const op = opFromWire(msg.op);
+    if (!op) {
+      void l.room.actions.ctl.send({ t: 'reject', cs: msg.cs }, from);
+      return;
+    }
     l.pendingFrom = from;
     l.pendingCs = msg.cs;
     l.pendingBlobs = msg.b;
     try {
-      applyRemote(msg.op, true);
+      applyRemote(op, true);
     } finally {
       l.pendingFrom = null;
       l.pendingCs = null;

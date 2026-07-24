@@ -37,6 +37,7 @@ import { relayHealth, selfId } from './room';
 import { sessionStore } from './store';
 import { applyJoin, abortJoin, type HeldBlob } from './snapshot';
 import { getLive, type Live } from './live';
+import { opFromWire, opToWire } from './wireOps';
 import type { BlobMeta, ReqMsg, SnapMsg } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 
@@ -230,7 +231,10 @@ function installReqSender(l: Live, req: PeerReq): void {
   const send = (op: Op, localApplied: boolean, blobs?: string[]): void => {
     const cs = req.nextCs++;
     req.sentLocal.set(cs, { localApplied });
-    const msg: ReqMsg = blobs && blobs.length ? { cs, op, b: blobs } : { cs, op };
+    /* wire-encode: a structural op's live slot trees would lose their
+       source bodies to JSON serialization (wireOps.ts) */
+    const w = opToWire(op);
+    const msg: ReqMsg = blobs && blobs.length ? { cs, op: w, b: blobs } : { cs, op: w };
     void l.room.actions.req.send(msg);
   };
 
@@ -249,7 +253,7 @@ function installReqSender(l: Live, req: PeerReq): void {
     for (const op of ops) {
       const cs = req.nextCs++;
       req.sentLocal.set(cs, { localApplied: true });   // value ops apply locally
-      void l.room.actions.req.send({ cs, op });
+      void l.room.actions.req.send({ cs, op: opToWire(op) });
     }
   };
 
@@ -460,7 +464,9 @@ function reportProgress(snap: SnapMsg, blobs: Map<string, HeldBlob>): void {
    stream stays gapless. If its cs was deferred, it APPLIES normally (the
    echo IS the application). Foreign ops (f !== selfId) always apply. */
 function installOpApply(l: Live): { drain: () => void; clearHole: () => void } {
-  const buffer = new Map<number, { op: Op; skip: boolean }>();
+  /* op is null when the wire payload failed to rebuild (opFromWire) —
+     the seq still advances through it, nothing applies */
+  const buffer = new Map<number, { op: Op | null; skip: boolean }>();
   let hole: ReturnType<typeof setTimeout> | null = null;
   let holeSeq = 0;
 
@@ -485,7 +491,7 @@ function installOpApply(l: Live): { drain: () => void; clearHole: () => void } {
       /* our own echo of a locally-applied op: advance the seq (kept gapless)
          but do NOT re-apply — dropping the fight with the live edit. Our own
          echo of a deferred op, and every foreign op, apply. */
-      if (!next.skip) {
+      if (!next.skip && next.op) {
         applyRemote(next.op);
         /* a remote setGlobal writes mirror.globals with nothing observable
            to React — bump the session version so GlobalsBar repaints the
@@ -512,7 +518,9 @@ function installOpApply(l: Live): { drain: () => void; clearHole: () => void } {
         l.peerReq!.sentLocal.delete(msg.cs);
       }
     }
-    buffer.set(q, { op, skip });
+    /* decode the wire form; a payload that doesn't rebuild still takes
+       its seq slot (gapless stream) but applies nothing */
+    buffer.set(q, { op: opFromWire(op), skip });
     drain();
   });
 
